@@ -8,17 +8,20 @@
 <style>
 .home-grid {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 230px 1fr;
   gap: 16px;
   align-items: start;
 }
 
-/* ── Teacher sidebar ── */
+/* ── Teacher panel ── */
 .teacher-panel { position: sticky; top: calc(var(--topbar-h) + 20px); }
-.teacher-list { display: flex; flex-direction: column; gap: 4px; max-height: calc(100vh - 200px); overflow-y: auto; padding-right: 2px; }
+.teacher-list {
+  display: flex; flex-direction: column; gap: 3px;
+  max-height: calc(100vh - 210px); overflow-y: auto; padding-right: 2px;
+}
 .teacher-row {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-radius: var(--radius-sm);
+  padding: 7px 10px; border-radius: var(--radius-sm);
   cursor: pointer; border: 1px solid transparent;
   transition: background 0.12s, border-color 0.12s;
 }
@@ -35,10 +38,9 @@
 }
 .filter-toggle.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 
-/* ── Month calendar ── */
-.cal-header {
-  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
-}
+/* ── 4-week calendar ── */
+.cal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cal-nav { display: flex; gap: 4px; }
 .cal-nav button {
   padding: 5px 12px; border: 1px solid var(--gray-300);
   background: #fff; border-radius: var(--radius-sm);
@@ -46,76 +48,79 @@
   transition: background 0.12s;
 }
 .cal-nav button:hover { background: var(--gray-100); }
-.cal-month-label { font-size: 16px; font-weight: 600; color: var(--gray-800); min-width: 100px; text-align: center; }
+.cal-range-label { font-size: 15px; font-weight: 600; color: var(--gray-800); }
 
 .cal-dow-row {
   display: grid; grid-template-columns: repeat(7, 1fr);
-  margin-bottom: 6px;
+  margin-bottom: 5px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--gray-200);
 }
-.cal-dow-cell {
+.cal-dow {
   text-align: center; font-size: 11px; font-weight: 500;
-  color: var(--gray-400); padding: 4px 0;
+  color: var(--gray-400); padding: 2px 0;
 }
-.cal-dow-cell.weekend { color: var(--danger); }
+.cal-dow.weekend { color: #C0392B; }
 
-.cal-grid-month {
-  display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
+.fw-grid { display: flex; flex-direction: column; gap: 5px; }
+.fw-week-label {
+  font-size: 10px; color: var(--gray-400);
+  padding: 2px 4px; margin-bottom: -3px;
 }
-.cal-cell {
-  min-height: 80px; border-radius: var(--radius-sm);
+.fw-week-label.cur { color: var(--primary); font-weight: 600; }
+.fw-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+
+.fw-cell {
+  min-height: 76px; border-radius: var(--radius-sm);
   border: 1px solid var(--gray-200); background: #fff;
-  padding: 6px 7px; cursor: default;
+  padding: 6px 7px; display: flex; flex-direction: column; gap: 3px;
   transition: border-color 0.12s, box-shadow 0.12s;
-  display: flex; flex-direction: column; gap: 3px;
 }
-.cal-cell:not(.empty):not(.other-month):hover {
-  border-color: var(--primary-mid);
-  box-shadow: 0 2px 6px rgba(24,95,165,0.08);
-  cursor: pointer;
-}
-.cal-cell.empty { background: transparent; border-color: transparent; }
-.cal-cell.other-month { background: var(--gray-50); }
-.cal-cell.other-month .cal-cell-date { color: var(--gray-300); }
-.cal-cell.today { border-color: var(--primary); background: var(--primary-light); }
-.cal-cell.today .cal-cell-date {
-  color: #fff; background: var(--primary);
-  width: 24px; height: 24px; border-radius: 50%;
+.fw-cell.clickable { cursor: pointer; }
+.fw-cell.clickable:hover { border-color: var(--primary-mid); box-shadow: 0 2px 6px rgba(24,95,165,0.08); }
+.fw-cell.weekend { background: #fafafa; }
+.fw-cell.past { background: var(--gray-50); }
+.fw-cell.past .fw-date { color: var(--gray-400); }
+.fw-cell.today { border: 1.5px solid var(--primary); background: var(--primary-light); }
+.fw-cell.today .fw-date-wrap {
+  background: var(--primary); color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
+  font-size: 11px; font-weight: 700;
 }
-.cal-cell.weekend-day { background: #fafafa; }
-.cal-cell.has-records { }
-.cal-cell-date { font-size: 13px; font-weight: 500; color: var(--gray-700); margin-bottom: 2px; }
-.cal-cell.weekend-day .cal-cell-date { color: var(--danger); }
 
-.cal-event {
-  background: var(--primary-light); border-radius: 3px;
-  padding: 2px 5px; font-size: 10px; color: var(--primary);
-  line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.fw-date { font-size: 13px; font-weight: 500; color: var(--gray-700); line-height: 1; }
+.fw-cell.weekend .fw-date { color: #C0392B; }
+.fw-cell.today .fw-date { color: #fff; }
+
+.fw-month-chip {
+  font-size: 8px; color: var(--gray-400);
+  background: var(--gray-100); padding: 0 4px;
+  border-radius: 3px; display: inline-block; margin-bottom: 1px;
+  line-height: 14px;
 }
-.cal-event.homeroom { background: var(--warning-light); color: var(--warning); }
-.cal-more { font-size: 10px; color: var(--gray-400); padding: 1px 3px; }
+.fw-events { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; flex: 1; }
+.fw-event {
+  font-size: 9px; padding: 2px 5px; border-radius: 3px;
+  line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fw-event.sub  { background: #E6F1FB; color: #0C447C; }
+.fw-event.home { background: #FAEEDA; color: #633806; }
+.fw-more { font-size: 9px; color: var(--gray-400); padding: 0 2px; }
 
 /* ── Detail modal ── */
 .detail-records { display: flex; flex-direction: column; gap: 10px; }
-.detail-record {
-  border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 12px;
-}
+.detail-record { border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 12px; }
 .detail-row { display: flex; gap: 8px; margin-bottom: 4px; font-size: 13px; align-items: center; }
 .detail-label { color: var(--gray-500); min-width: 60px; flex-shrink: 0; font-size: 12px; }
 .detail-val { color: var(--gray-900); }
 .node-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-.node-chip {
-  font-size: 10px; padding: 2px 7px; border-radius: 20px;
-  background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200);
-}
+.node-chip { font-size: 10px; padding: 2px 7px; border-radius: 20px; background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); }
 
 /* ── Teacher popup ── */
 .teacher-popup {
   position: fixed; z-index: 300; background: #fff;
   border: 1px solid var(--gray-200); border-radius: var(--radius);
-  padding: 16px; width: 260px;
+  padding: 16px; width: 264px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: none;
 }
 .popup-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -124,14 +129,14 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 14px; font-weight: 700; flex-shrink: 0;
 }
-.popup-avatar.male { background: var(--primary-light); color: var(--primary); }
+.popup-avatar.male   { background: var(--primary-light); color: var(--primary); }
 .popup-avatar.female { background: #FBEAF0; color: var(--female); }
-.popup-name { font-size: 15px; font-weight: 600; }
+.popup-name  { font-size: 15px; font-weight: 600; }
 .popup-field { display: flex; gap: 6px; font-size: 12px; padding: 3px 0; }
-.popup-field .lbl { color: var(--gray-500); min-width: 50px; flex-shrink: 0; }
+.popup-field .lbl { color: var(--gray-500); min-width: 52px; flex-shrink: 0; }
 .popup-field .val { color: var(--gray-800); word-break: break-all; }
 .popup-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--gray-100); }
-.popup-section-title { font-size: 10px; color: var(--gray-400); font-weight: 500; letter-spacing: 0.5px; margin-bottom: 6px; }
+.popup-section-title { font-size: 10px; color: var(--gray-400); letter-spacing: 0.5px; margin-bottom: 6px; }
 .upcoming-dates { display: flex; flex-wrap: wrap; gap: 4px; }
 .upcoming-date { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--primary-light); color: var(--primary); }
 .restriction-note { font-size: 11px; color: var(--warning); background: var(--warning-light); padding: 4px 8px; border-radius: 4px; margin-top: 6px; }
@@ -139,7 +144,6 @@
 </head>
 <body>
 
-<!-- Password screen -->
 <div class="pw-screen" id="pw-screen">
   <div class="pw-logo">新莊國小</div>
   <div class="pw-school">代理代課管理系統</div>
@@ -168,7 +172,7 @@
         <div class="topbar-sub" id="topbar-sub"></div>
       </div>
       <div class="topbar-actions">
-        <button class="btn btn-secondary btn-sm" id="btn-today">回到本月</button>
+        <button class="btn btn-secondary btn-sm" id="btn-today">回到本週</button>
         <a href="pages/register.html" class="btn btn-primary btn-sm" id="btn-register" style="display:none">＋ 新增代課</a>
       </div>
     </div>
@@ -187,29 +191,31 @@
           </div>
         </div>
 
-        <!-- Right: month calendar -->
+        <!-- Right: 4-week calendar -->
         <div>
           <div class="cal-header">
-            <div class="cal-nav" style="display:flex;gap:4px">
-              <button id="btn-prev">‹ 上個月</button>
-              <button id="btn-next">下個月 ›</button>
+            <div class="cal-nav">
+              <button id="btn-prev">‹ 上一週</button>
+              <button id="btn-next">下一週 ›</button>
             </div>
-            <div class="cal-month-label" id="cal-month-label"></div>
+            <div class="cal-range-label" id="cal-range-label"></div>
+            <button class="btn btn-secondary btn-sm" id="btn-today2" style="margin-left:auto">回到本週</button>
           </div>
 
-          <!-- Day-of-week header -->
+          <!-- 日一二三四五六 -->
           <div class="cal-dow-row">
-            <div class="cal-dow-cell weekend">日</div>
-            <div class="cal-dow-cell">一</div>
-            <div class="cal-dow-cell">二</div>
-            <div class="cal-dow-cell">三</div>
-            <div class="cal-dow-cell">四</div>
-            <div class="cal-dow-cell">五</div>
-            <div class="cal-dow-cell weekend">六</div>
+            <div class="cal-dow weekend">日</div>
+            <div class="cal-dow">一</div>
+            <div class="cal-dow">二</div>
+            <div class="cal-dow">三</div>
+            <div class="cal-dow">四</div>
+            <div class="cal-dow">五</div>
+            <div class="cal-dow weekend">六</div>
           </div>
 
-          <div class="cal-grid-month" id="cal-grid-month"></div>
+          <div class="fw-grid" id="fw-grid"></div>
         </div>
+
       </div>
     </div>
   </div>
@@ -240,8 +246,7 @@ import {
 initLayout("home");
 
 // ── Helpers ────────────────────────────────────────────────────
-const DAYS_ZH = ["日","一","二","三","四","五","六"];
-const MONTHS_ZH = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const DOW_ZH = ["日","一","二","三","四","五","六"];
 
 function toYMD(d) {
   return d.getFullYear() + "-" +
@@ -252,14 +257,22 @@ function parseYMD(s) {
   const [y,m,d] = s.split("-").map(Number);
   return new Date(y, m-1, d);
 }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+
+// Get Sunday of the week containing d
+function getSundayOf(d) {
+  const r = new Date(d);
+  r.setDate(r.getDate() - r.getDay()); // getDay()==0 for Sun → no shift
+  return r;
+}
 
 // ── State ──────────────────────────────────────────────────────
-let viewYear  = new Date().getFullYear();
-let viewMonth = new Date().getMonth(); // 0-indexed
-let hideBusy  = true;
-let allTeachers    = [];
-let recordsByDate  = {};
-let todayBusy      = new Set();
+// anchorSunday = the Sunday of the "current week" row (row 2 of 4)
+let anchorSunday = getSundayOf(new Date());
+let hideBusy     = true;
+let allTeachers  = [];
+let recordsByDate = {};
+let todayBusy    = new Set();
 
 // ── Fetch ──────────────────────────────────────────────────────
 async function fetchTeachers() {
@@ -267,10 +280,10 @@ async function fetchTeachers() {
   allTeachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-async function fetchRecordsForMonth() {
-  const from = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-01`;
-  const lastDay = new Date(viewYear, viewMonth+1, 0).getDate();
-  const to = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${lastDay}`;
+async function fetchRecords() {
+  // fetch 4 weeks: from (anchorSunday - 7) to (anchorSunday + 20)
+  const from = toYMD(addDays(anchorSunday, -7));
+  const to   = toYMD(addDays(anchorSunday, 20));
   const q = query(
     collection(db, "records"),
     where("date", ">=", from),
@@ -299,72 +312,89 @@ async function fetchUpcomingForTeacher(tid) {
 
 // ── Render calendar ────────────────────────────────────────────
 function renderCalendar() {
-  const todayStr  = toYMD(new Date());
-  const todayDate = new Date();
-
-  document.getElementById("cal-month-label").textContent =
-    `${viewYear} 年 ${MONTHS_ZH[viewMonth]}`;
-  document.getElementById("topbar-sub").textContent =
-    `${viewYear} 年 ${viewMonth+1} 月`;
-
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
-  const lastDate = new Date(viewYear, viewMonth+1, 0).getDate();
-  const prevLastDate = new Date(viewYear, viewMonth, 0).getDate();
-
-  const grid = document.getElementById("cal-grid-month");
+  const todayStr = toYMD(new Date());
+  const grid = document.getElementById("fw-grid");
   grid.innerHTML = "";
 
-  // leading blank cells (prev month)
-  for (let i = 0; i < firstDay; i++) {
-    const d = prevLastDate - firstDay + 1 + i;
-    const cell = document.createElement("div");
-    cell.className = "cal-cell other-month";
-    cell.innerHTML = `<div class="cal-cell-date">${d}</div>`;
-    grid.appendChild(cell);
+  // 4 weeks: row0 = anchorSunday-7, row1 = anchorSunday, row2 = +7, row3 = +14
+  const weekStarts = [
+    addDays(anchorSunday, -7),
+    anchorSunday,
+    addDays(anchorSunday, 7),
+    addDays(anchorSunday, 14),
+  ];
+
+  // Build range label from first Sunday to last Saturday
+  const firstDay = weekStarts[0];
+  const lastDay  = addDays(weekStarts[3], 6);
+  const sameYear = firstDay.getFullYear() === lastDay.getFullYear();
+  const sameMonth = firstDay.getMonth() === lastDay.getMonth();
+  let rangeLabel;
+  if (sameMonth) {
+    rangeLabel = `${firstDay.getFullYear()} 年 ${firstDay.getMonth()+1} 月`;
+  } else if (sameYear) {
+    rangeLabel = `${firstDay.getFullYear()} 年 ${firstDay.getMonth()+1} 月 / ${lastDay.getMonth()+1} 月`;
+  } else {
+    rangeLabel = `${firstDay.getFullYear()}/${firstDay.getMonth()+1} ～ ${lastDay.getFullYear()}/${lastDay.getMonth()+1}`;
   }
+  document.getElementById("cal-range-label").textContent = rangeLabel;
+  document.getElementById("topbar-sub").textContent = rangeLabel;
 
-  // current month days
-  for (let d = 1; d <= lastDate; d++) {
-    const date = new Date(viewYear, viewMonth, d);
-    const ds   = toYMD(date);
-    const dow  = date.getDay(); // 0=Sun,6=Sat
-    const isToday   = ds === todayStr;
-    const isWeekend = dow === 0 || dow === 6;
-    const recs = recordsByDate[ds] || [];
+  const weekLabels = ["↑ 上週", "→ 本週", "↓ 下週", "↓ 下下週"];
 
-    const cell = document.createElement("div");
-    cell.className = "cal-cell" +
-      (isToday   ? " today"       : "") +
-      (isWeekend ? " weekend-day" : "") +
-      (recs.length ? " has-records" : "");
+  weekStarts.forEach((sunday, wi) => {
+    // Week label
+    const lbl = document.createElement("div");
+    lbl.className = "fw-week-label" + (wi === 1 ? " cur" : "");
+    lbl.textContent = weekLabels[wi];
+    grid.appendChild(lbl);
 
-    const SHOW = 2;
-    const shown = recs.slice(0, SHOW);
-    const more  = recs.length - SHOW;
+    const weekRow = document.createElement("div");
+    weekRow.className = "fw-week";
 
-    cell.innerHTML = `
-      <div class="cal-cell-date">${d}</div>
-      ${shown.map(r => `
-        <div class="cal-event ${r.subType === "homeroom" ? "homeroom" : ""}" title="${r.absentName||""} → ${r.subName||""}">
-          ${r.absentName||"?"} → ${r.subName||"?"}
-        </div>`).join("")}
-      ${more > 0 ? `<div class="cal-more">還有 ${more} 筆…</div>` : ""}`;
+    for (let di = 0; di < 7; di++) {
+      const date = addDays(sunday, di);
+      const ds   = toYMD(date);
+      const dow  = date.getDay(); // 0=Sun,6=Sat
+      const isWeekend = dow === 0 || dow === 6;
+      const isToday   = ds === todayStr;
+      const isPast    = ds < todayStr;
+      const recs = recordsByDate[ds] || [];
 
-    if (recs.length) {
-      cell.addEventListener("click", () => showDayModal(ds, recs));
+      // Show month chip if 1st of month or first cell of the 4-week view
+      const showMonthChip = date.getDate() === 1 || (wi === 0 && di === 0);
+
+      const cell = document.createElement("div");
+      cell.className = "fw-cell" +
+        (isWeekend ? " weekend" : "") +
+        (isPast && !isToday ? " past" : "") +
+        (isToday ? " today" : "") +
+        (recs.length ? " clickable" : "");
+
+      const SHOW = 2;
+      const shown = recs.slice(0, SHOW);
+      const more  = recs.length - SHOW;
+
+      cell.innerHTML = `
+        ${showMonthChip ? `<div class="fw-month-chip">${date.getMonth()+1}月</div>` : ""}
+        <div class="fw-date-wrap">
+          <div class="fw-date">${date.getDate()}</div>
+        </div>
+        <div class="fw-events">
+          ${shown.map(r => `
+            <div class="fw-event ${r.subType === "homeroom" ? "home" : "sub"}"
+                 title="${r.absentName||""}→${r.subName||""}">
+              ${r.absentName||"?"}→${r.subName||"?"}
+            </div>`).join("")}
+          ${more > 0 ? `<div class="fw-more">還有 ${more} 筆…</div>` : ""}
+        </div>`;
+
+      if (recs.length) cell.addEventListener("click", () => showDayModal(ds, recs));
+      weekRow.appendChild(cell);
     }
-    grid.appendChild(cell);
-  }
 
-  // trailing blank cells (next month)
-  const total = firstDay + lastDate;
-  const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
-  for (let d = 1; d <= trailing; d++) {
-    const cell = document.createElement("div");
-    cell.className = "cal-cell other-month";
-    cell.innerHTML = `<div class="cal-cell-date">${d}</div>`;
-    grid.appendChild(cell);
-  }
+    grid.appendChild(weekRow);
+  });
 }
 
 // ── Render teachers ────────────────────────────────────────────
@@ -375,8 +405,9 @@ function renderTeachers() {
 
   const list = document.getElementById("teacher-list");
   const visible = allTeachers.filter(t => {
-    if (t.disabledFrom && t.disabledTo && todayStr >= t.disabledFrom && todayStr <= t.disabledTo) return false;
-    if (t.blockedDays && t.blockedDays.includes(todayDow)) return false;
+    if (t.disabledFrom && t.disabledTo &&
+        todayStr >= t.disabledFrom && todayStr <= t.disabledTo) return false;
+    if (t.blockedDays?.includes(todayDow)) return false;
     if (hideBusy && todayBusy.has(t.id)) return false;
     return true;
   });
@@ -390,13 +421,12 @@ function renderTeachers() {
   visible.forEach(t => {
     const busy = todayBusy.has(t.id);
     const nameClass = t.gender === "female" ? "name-female" : "name-male";
-    const light = busy ? "light-green" : "light-gray";
     const todayRec = (recordsByDate[todayStr] || []).find(r => r.subTeacherId === t.id);
 
     const div = document.createElement("div");
     div.className = "teacher-row" + (busy ? " has-class" : "");
     div.innerHTML = `
-      <span class="light ${light}"></span>
+      <span class="light ${busy ? "light-green" : "light-gray"}"></span>
       <div style="flex:1;min-width:0">
         <div class="teacher-name ${nameClass}">${t.name}</div>
         ${busy && todayRec
@@ -412,9 +442,8 @@ function renderTeachers() {
 async function showTeacherPopup(e, t) {
   const popup = document.getElementById("teacher-popup");
   const upcoming = await fetchUpcomingForTeacher(t.id);
-  const dayNames = ["日","一","二","三","四","五","六"];
   const blockedText = t.blockedDays?.length
-    ? "每週" + t.blockedDays.map(d => dayNames[d]).join("、") + " 不可代課" : "";
+    ? "每週" + t.blockedDays.map(d => DOW_ZH[d]).join("、") + " 不可代課" : "";
   const disabledText = (t.disabledFrom && t.disabledTo)
     ? `${t.disabledFrom} ～ ${t.disabledTo} 停用中` : "";
 
@@ -426,11 +455,11 @@ async function showTeacherPopup(e, t) {
         <div class="text-xs text-muted">${t.eduLabel||""}</div>
       </div>
     </div>
-    ${t.dailyWage ? `<div class="popup-field"><span class="lbl">日薪</span><span class="val">${t.dailyWage} 元</span></div>` : ""}
-    ${t.subjects ? `<div class="popup-field"><span class="lbl">可代科目</span><span class="val">${t.subjects}</span></div>` : ""}
-    ${t.phone  ? `<div class="popup-field"><span class="lbl">電話</span><span class="val">${t.phone}</span></div>` : ""}
-    ${t.email  ? `<div class="popup-field"><span class="lbl">Email</span><span class="val">${t.email}</span></div>` : ""}
-    ${t.lineId ? `<div class="popup-field"><span class="lbl">Line ID</span><span class="val">${t.lineId}</span></div>` : ""}
+    ${t.dailyWage ? `<div class="popup-field"><span class="lbl">日薪</span><span class="val">${t.dailyWage.toLocaleString()} 元</span></div>` : ""}
+    ${t.subjects  ? `<div class="popup-field"><span class="lbl">可代科目</span><span class="val">${t.subjects}</span></div>` : ""}
+    ${t.phone     ? `<div class="popup-field"><span class="lbl">電話</span><span class="val">${t.phone}</span></div>` : ""}
+    ${t.email     ? `<div class="popup-field"><span class="lbl">Email</span><span class="val">${t.email}</span></div>` : ""}
+    ${t.lineId    ? `<div class="popup-field"><span class="lbl">Line ID</span><span class="val">${t.lineId}</span></div>` : ""}
     ${upcoming.length ? `
       <div class="popup-section">
         <div class="popup-section-title">已排定代課日</div>
@@ -442,21 +471,22 @@ async function showTeacherPopup(e, t) {
   popup.style.display = "block";
   const rect = e.currentTarget.getBoundingClientRect();
   let left = rect.right + 8;
-  if (left + 260 > window.innerWidth) left = rect.left - 268;
+  if (left + 264 > window.innerWidth) left = rect.left - 272;
   popup.style.left = left + "px";
-  popup.style.top  = Math.min(rect.top, window.innerHeight - 300) + "px";
+  popup.style.top = Math.min(rect.top, window.innerHeight - 320) + "px";
 }
 
 document.addEventListener("click", e => {
   const popup = document.getElementById("teacher-popup");
-  if (!popup.contains(e.target) && !e.target.closest(".teacher-row")) popup.style.display = "none";
+  if (!popup.contains(e.target) && !e.target.closest(".teacher-row"))
+    popup.style.display = "none";
 });
 
 // ── Day modal ──────────────────────────────────────────────────
 function showDayModal(ds, recs) {
   const d = parseYMD(ds);
   document.getElementById("day-modal-title").textContent =
-    `${d.getMonth()+1} 月 ${d.getDate()} 日（週${DAYS_ZH[d.getDay()]}）代課明細`;
+    `${d.getMonth()+1} 月 ${d.getDate()} 日（週${DOW_ZH[d.getDay()]}）代課明細`;
 
   document.getElementById("day-modal-body").innerHTML = recs.map(r => `
     <div class="detail-record">
@@ -481,7 +511,7 @@ function showDayModal(ds, recs) {
       </div>
       ${r.subType !== "homeroom" && r.sessions?.length ? `
         <div class="node-chips">
-          ${r.sessions.map(s=>`<span class="node-chip">第${s}節</span>`).join("")}
+          ${r.sessions.map(s=>`<span class="node-chip">第 ${s} 節</span>`).join("")}
         </div>` : ""}
       ${r.notes ? `<div class="detail-row mt-4"><span class="detail-label">備註</span><span class="detail-val">${r.notes}</span></div>` : ""}
       <div class="detail-row mt-4">
@@ -501,19 +531,12 @@ document.getElementById("day-modal").addEventListener("click", e => {
 });
 
 // ── Navigation ─────────────────────────────────────────────────
-document.getElementById("btn-prev").addEventListener("click", () => {
-  if (viewMonth === 0) { viewMonth = 11; viewYear--; } else viewMonth--;
-  loadAll();
-});
-document.getElementById("btn-next").addEventListener("click", () => {
-  if (viewMonth === 11) { viewMonth = 0; viewYear++; } else viewMonth++;
-  loadAll();
-});
-document.getElementById("btn-today").addEventListener("click", () => {
-  viewYear  = new Date().getFullYear();
-  viewMonth = new Date().getMonth();
-  loadAll();
-});
+function goWeek(n) { anchorSunday = addDays(anchorSunday, n*7); loadAll(); }
+
+document.getElementById("btn-prev").addEventListener("click",   () => goWeek(-1));
+document.getElementById("btn-next").addEventListener("click",   () => goWeek(1));
+document.getElementById("btn-today").addEventListener("click",  () => { anchorSunday = getSundayOf(new Date()); loadAll(); });
+document.getElementById("btn-today2").addEventListener("click", () => { anchorSunday = getSundayOf(new Date()); loadAll(); });
 
 document.getElementById("toggle-hide-busy").addEventListener("click", e => {
   hideBusy = !hideBusy;
@@ -523,7 +546,7 @@ document.getElementById("toggle-hide-busy").addEventListener("click", e => {
 
 // ── Load ───────────────────────────────────────────────────────
 async function loadAll() {
-  await Promise.all([fetchTeachers(), fetchRecordsForMonth()]);
+  await Promise.all([fetchTeachers(), fetchRecords()]);
   renderCalendar();
   renderTeachers();
   setTimeout(() => {

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代課老師管理｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.page-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.search-box { position: relative; flex: 1; min-width: 180px; max-width: 280px; }
+.search-box input { padding-left: 30px; }
+.search-icon {
+  position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+  color: var(--gray-400); font-size: 14px; pointer-events: none;
+}
+.teacher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.teacher-card {
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: var(--radius); padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  transition: box-shadow 0.15s;
+}
+.teacher-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+.tc-header { display: flex; align-items: center; gap: 10px; }
+.tc-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; flex-shrink: 0;
+}
+.tc-avatar.male   { background: var(--primary-light); color: var(--primary); }
+.tc-avatar.female { background: #FBEAF0; color: var(--female); }
+.tc-name { font-size: 15px; font-weight: 600; }
+.tc-edu  { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
+.tc-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+.tc-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.tc-field .lbl { font-size: 10px; color: var(--gray-400); margin-bottom: 1px; }
+.tc-field .val { font-size: 12px; color: var(--gray-800); word-break: break-all; }
+.tc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-restriction {
+  background: var(--warning-light); border-radius: var(--radius-sm);
+  padding: 6px 10px; font-size: 11px; color: var(--warning);
+  line-height: 1.6;
+}
+
+/* form */
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.form-grid-2 .full { grid-column: 1 / -1; }
+.radio-group { display: flex; gap: 16px; }
+.radio-group label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.day-checks { display: flex; gap: 6px; flex-wrap: wrap; }
+.day-check label {
+  display: flex; align-items: center; gap: 4px; font-size: 12px;
+  padding: 3px 9px; border-radius: 20px;
+  border: 1px solid var(--gray-300); background: #fff;
+  cursor: pointer; transition: all 0.12s; user-select: none;
+}
+.day-check input[type=checkbox] { display: none; }
+.day-check.checked label { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+
+.edu-list { display: flex; flex-direction: column; gap: 5px; }
+.edu-opt {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--gray-200); cursor: pointer; transition: all 0.12s;
+}
+.edu-opt.selected { background: var(--primary-light); border-color: var(--primary); }
+.edu-opt input { margin-top: 3px; flex-shrink: 0; cursor: pointer; }
+.edu-opt-label { font-size: 12px; color: var(--gray-800); font-weight: 500; }
+.edu-opt-wage  { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+
+.dup-warn {
+  display: none; margin-top: 6px;
+  background: var(--warning-light); color: var(--warning);
+  border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px;
+}
+.dup-warn.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div>
+  <div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="school">高雄市左營區</div>
+      <div class="system">新莊國小代課系統</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">代課老師管理</div>
+        <div class="topbar-sub" id="teacher-count">載入中…</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" id="btn-add">＋ 新增代課老師</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="page-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input class="form-control" id="search-input" placeholder="搜尋姓名…">
+        </div>
+        <select class="form-control form-select" id="filter-gender" style="width:100px">
+          <option value="">全部性別</option>
+          <option value="male">男</option>
+          <option value="female">女</option>
+        </select>
+        <select class="form-control form-select" id="filter-status" style="width:120px">
+          <option value="">全部狀態</option>
+          <option value="active">可代課</option>
+          <option value="disabled">停用中</option>
+        </select>
+      </div>
+      <div class="teacher-grid" id="teacher-grid">
+        <div class="text-muted text-sm">載入中…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-backdrop hidden" id="edit-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">新增代課老師</div>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-group full">
+        <label class="form-label">姓名 <span style="color:var(--danger)">*</span></label>
+        <input class="form-control" id="f-name" placeholder="輸入姓名（重複時請加備註，如：王小明（替代役））">
+        <div class="dup-warn" id="dup-warn">⚠ 已有同名老師，請在姓名後加上括號備註加以區分</div>
+      </div>
+
+      <div class="form-group full">
+        <label class="form-label">性別 <span style="color:var(--danger)">*</span></label>
+        <div class="radio-group">
+          <label><input type="radio" name="gender" value="male" checked> <span>男</span></label>
+          <label><input type="radio" name="gender" value="female"> <span>女</span></label>
+        </div>
+      </div>
+
+      <div class="form-group full">
+        <label class="form-label">學歷類別 <span style="color:var(--danger)">*</span>
+          <span class="text-xs text-muted ml-auto">（決定日薪計算）</span>
+        </label>
+        <div class="edu-list" id="edu-list">
+          <div class="text-muted text-sm">載入中…</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">電話</label>
+        <input class="form-control" id="f-phone" placeholder="0912-345-678">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-control" id="f-email" type="email" placeholder="name@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Line ID</label>
+        <input class="form-control" id="f-line" placeholder="line_id">
+      </div>
+      <div class="form-group">
+        <label class="form-label">可代科目 / 專長</label>
+        <input class="form-control" id="f-subjects" placeholder="數學、自然、英文…">
+      </div>
+
+      <div class="form-group full">
+        <label class="form-label">固定不可代課的星期</label>
+        <div class="day-checks" id="day-checks">
+          <div class="day-check" data-val="0"><label><input type="checkbox" value="0"><span>日</span></label></div>
+          <div class="day-check" data-val="1"><label><input type="checkbox" value="1"><span>一</span></label></div>
+          <div class="day-check" data-val="2"><label><input type="checkbox" value="2"><span>二</span></label></div>
+          <div class="day-check" data-val="3"><label><input type="checkbox" value="3"><span>三</span></label></div>
+          <div class="day-check" data-val="4"><label><input type="checkbox" value="4"><span>四</span></label></div>
+          <div class="day-check" data-val="5"><label><input type="checkbox" value="5"><span>五</span></label></div>
+          <div class="day-check" data-val="6"><label><input type="checkbox" value="6"><span>六</span></label></div>
+        </div>
+        <div class="text-xs text-muted mt-4">換學期時請手動更新。</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">停用起始日</label>
+        <input class="form-control" id="f-disabled-from" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">停用結束日</label>
+        <input class="form-control" id="f-disabled-to" type="date">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">備註</label>
+        <textarea class="form-control" id="f-notes" rows="2" placeholder="其他備注…"></textarea>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-secondary" id="modal-cancel">取消</button>
+      <button class="btn btn-primary" id="modal-save">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div class="modal-backdrop hidden" id="del-modal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">確認刪除</div>
+      <button class="modal-close" id="del-close">✕</button>
+    </div>
+    <p style="font-size:14px;color:var(--gray-700);margin-bottom:16px">
+      確定要刪除 <strong id="del-name"></strong> 的資料？<br>
+      <span style="font-size:12px;color:var(--danger)">此操作無法復原。</span>
+    </p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" id="del-cancel">取消</button>
+      <button class="btn btn-danger" id="del-confirm">確認刪除</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { isAdmin } from "../js/auth.js";
+import {
+  collection, getDocs, doc, setDoc, addDoc, deleteDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("sub-teachers");
+
+const DOW_ZH = ["日","一","二","三","四","五","六"];
+let salaryTable = {};
+let allTeachers = [];
+let editingId   = null;
+let deleteId    = null;
+
+// ── Load settings & salary table ──────────────────────────────
+async function loadSettings() {
+  const snap = await getDoc(doc(db, "settings", "main"));
+  if (snap.exists()) salaryTable = snap.data().salaryTable || {};
+  renderEduList();
+}
+
+function renderEduList() {
+  const list = document.getElementById("edu-list");
+  list.innerHTML = "";
+  Object.entries(salaryTable).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([code, s]) => {
+    const wage = s.daily?.[30] ? Number(s.daily[30]).toLocaleString() + " 元/日（30天月）" : "—";
+    const div = document.createElement("div");
+    div.className = "edu-opt";
+    div.dataset.code = code;
+    div.innerHTML = `
+      <input type="radio" name="edu" value="${code}" id="edu${code}">
+      <div>
+        <div class="edu-opt-label">${code}. ${s.label}</div>
+        <div class="edu-opt-wage">日薪參考：${wage}</div>
+      </div>`;
+    div.addEventListener("click", () => {
+      document.querySelectorAll(".edu-opt").forEach(o => o.classList.remove("selected"));
+      div.classList.add("selected");
+      div.querySelector("input").checked = true;
+    });
+    list.appendChild(div);
+  });
+}
+
+// ── Load teachers ─────────────────────────────────────────────
+async function loadTeachers() {
+  const snap = await getDocs(collection(db, "teachers"));
+  allTeachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  document.getElementById("teacher-count").textContent = `共 ${allTeachers.length} 位`;
+  renderCards();
+}
+
+// ── Render cards ──────────────────────────────────────────────
+function renderCards() {
+  const search = document.getElementById("search-input").value.trim().toLowerCase();
+  const gender = document.getElementById("filter-gender").value;
+  const status = document.getElementById("filter-status").value;
+  const today  = new Date().toISOString().slice(0,10);
+
+  const filtered = allTeachers.filter(t => {
+    if (search && !t.name?.toLowerCase().includes(search)) return false;
+    if (gender && t.gender !== gender) return false;
+    const dis = t.disabledFrom && t.disabledTo &&
+      today >= t.disabledFrom && today <= t.disabledTo;
+    if (status === "active"   &&  dis) return false;
+    if (status === "disabled" && !dis) return false;
+    return true;
+  });
+
+  const grid = document.getElementById("teacher-grid");
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="text-muted text-sm" style="padding:16px">沒有符合條件的老師</div>`;
+    return;
+  }
+  grid.innerHTML = "";
+
+  filtered.forEach(t => {
+    const today2  = new Date().toISOString().slice(0,10);
+    const isDisabled = t.disabledFrom && t.disabledTo &&
+      today2 >= t.disabledFrom && today2 <= t.disabledTo;
+    const edu = salaryTable[t.eduCode];
+    const eduLabel = edu ? `${t.eduCode}. ${edu.label}` : (t.eduLabel || "—");
+    const wage30   = edu?.daily?.[30] ? Number(edu.daily[30]).toLocaleString() + " 元" : "—";
+    const blocked  = t.blockedDays?.length
+      ? "每週" + t.blockedDays.map(d=>DOW_ZH[d]).join("、") + " 不可代課" : "";
+
+    const card = document.createElement("div");
+    card.className = "teacher-card";
+    card.innerHTML = `
+      <div class="tc-header">
+        <div class="tc-avatar ${t.gender==="female"?"female":"male"}">${(t.name||"?").slice(0,2)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="tc-name ${t.gender==="female"?"name-female":"name-male"}">${t.name||"—"}</div>
+          <div class="tc-edu">${eduLabel}</div>
+        </div>
+        <div class="tc-actions">
+          <button class="btn btn-secondary btn-sm" data-edit="${t.id}">編輯</button>
+          <button class="btn btn-danger btn-sm" data-del="${t.id}" data-name="${t.name}">刪除</button>
+        </div>
+      </div>
+
+      <div class="tc-fields">
+        <div class="tc-field"><div class="lbl">日薪（30天月）</div><div class="val">${wage30}</div></div>
+        <div class="tc-field"><div class="lbl">電話</div><div class="val">${t.phone||"—"}</div></div>
+        <div class="tc-field"><div class="lbl">Email</div><div class="val">${t.email||"—"}</div></div>
+        <div class="tc-field"><div class="lbl">Line ID</div><div class="val">${t.lineId||"—"}</div></div>
+      </div>
+
+      ${t.subjects ? `<div>
+        <div class="text-xs text-muted" style="margin-bottom:4px">可代科目</div>
+        <div class="tc-tags">
+          ${t.subjects.split(/[、,，]/).map(s=>`<span class="tag tag-blue">${s.trim()}</span>`).join("")}
+        </div></div>` : ""}
+
+      ${(blocked||isDisabled) ? `<div class="tc-restriction">
+        ${blocked ? `⚠ ${blocked}<br>` : ""}
+        ${isDisabled ? `🔴 停用中：${t.disabledFrom} ～ ${t.disabledTo}` : ""}
+      </div>` : ""}
+      ${t.notes ? `<div class="text-xs text-muted">${t.notes}</div>` : ""}`;
+
+    card.querySelector(`[data-edit]`).addEventListener("click", () => openEdit(t));
+    card.querySelector(`[data-del]`).addEventListener("click",  () => openDelete(t));
+    grid.appendChild(card);
+  });
+}
+
+// ── Day-check toggle ──────────────────────────────────────────
+document.querySelectorAll(".day-check").forEach(dc => {
+  dc.querySelector("input").addEventListener("change", e => {
+    dc.classList.toggle("checked", e.target.checked);
+  });
+});
+
+// ── Duplicate check ────────────────────────────────────────────
+function isDuplicate(name) {
+  return allTeachers.some(t => t.name?.trim() === name.trim() && t.id !== editingId);
+}
+
+document.getElementById("f-name").addEventListener("input", e => {
+  const dup = e.target.value.trim() && isDuplicate(e.target.value);
+  document.getElementById("dup-warn").classList.toggle("show", dup);
+});
+
+// ── Open / close modal ─────────────────────────────────────────
+function clearForm() {
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-phone").value = "";
+  document.getElementById("f-email").value = "";
+  document.getElementById("f-line").value = "";
+  document.getElementById("f-subjects").value = "";
+  document.getElementById("f-disabled-from").value = "";
+  document.getElementById("f-disabled-to").value = "";
+  document.getElementById("f-notes").value = "";
+  document.querySelector('input[name="gender"][value="male"]').checked = true;
+  document.querySelectorAll('input[name="edu"]').forEach(r => r.checked = false);
+  document.querySelectorAll(".edu-opt").forEach(o => o.classList.remove("selected"));
+  document.querySelectorAll(".day-check").forEach(dc => {
+    dc.querySelector("input").checked = false;
+    dc.classList.remove("checked");
+  });
+  document.getElementById("dup-warn").classList.remove("show");
+}
+
+function openAdd() {
+  editingId = null;
+  document.getElementById("modal-title").textContent = "新增代課老師";
+  clearForm();
+  document.getElementById("edit-modal").classList.remove("hidden");
+}
+
+function openEdit(t) {
+  editingId = t.id;
+  document.getElementById("modal-title").textContent = "編輯代課老師";
+  document.getElementById("f-name").value     = t.name    || "";
+  document.getElementById("f-phone").value    = t.phone   || "";
+  document.getElementById("f-email").value    = t.email   || "";
+  document.getElementById("f-line").value     = t.lineId  || "";
+  document.getElementById("f-subjects").value = t.subjects|| "";
+  document.getElementById("f-disabled-from").value = t.disabledFrom || "";
+  document.getElementById("f-disabled-to").value   = t.disabledTo   || "";
+  document.getElementById("f-notes").value    = t.notes   || "";
+  document.getElementById("dup-warn").classList.remove("show");
+
+  document.querySelectorAll('input[name="gender"]').forEach(r => {
+    r.checked = r.value === (t.gender||"male");
+  });
+  document.querySelectorAll(".edu-opt").forEach(o => {
+    const sel = o.dataset.code === String(t.eduCode||"");
+    o.classList.toggle("selected", sel);
+    o.querySelector("input").checked = sel;
+  });
+  document.querySelectorAll(".day-check").forEach(dc => {
+    const val = Number(dc.dataset.val);
+    const chk = t.blockedDays?.includes(val)||false;
+    dc.querySelector("input").checked = chk;
+    dc.classList.toggle("checked", chk);
+  });
+  document.getElementById("edit-modal").classList.remove("hidden");
+}
+
+function closeEditModal() {
+  document.getElementById("edit-modal").classList.add("hidden");
+  editingId = null;
+}
+
+// ── Save ──────────────────────────────────────────────────────
+async function save() {
+  const name = document.getElementById("f-name").value.trim();
+  if (!name) { alert("請輸入姓名"); return; }
+  if (isDuplicate(name)) {
+    document.getElementById("dup-warn").classList.add("show");
+    document.getElementById("f-name").focus();
+    return;
+  }
+  const eduCode = document.querySelector('input[name="edu"]:checked')?.value;
+  if (!eduCode) { alert("請選擇學歷類別"); return; }
+
+  const gender      = document.querySelector('input[name="gender"]:checked')?.value || "male";
+  const blockedDays = [...document.querySelectorAll(".day-check input:checked")].map(c=>Number(c.value));
+  const edu         = salaryTable[eduCode];
+
+  const data = {
+    name, gender,
+    eduCode: Number(eduCode),
+    eduLabel: edu?.label || "",
+    dailyWage: edu?.daily?.[30] || 0,
+    phone:        document.getElementById("f-phone").value.trim(),
+    email:        document.getElementById("f-email").value.trim(),
+    lineId:       document.getElementById("f-line").value.trim(),
+    subjects:     document.getElementById("f-subjects").value.trim(),
+    blockedDays,
+    disabledFrom: document.getElementById("f-disabled-from").value || null,
+    disabledTo:   document.getElementById("f-disabled-to").value   || null,
+    notes:        document.getElementById("f-notes").value.trim(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    if (editingId) {
+      await setDoc(doc(db,"teachers",editingId), data, { merge:true });
+    } else {
+      data.createdAt = new Date().toISOString();
+      await addDoc(collection(db,"teachers"), data);
+    }
+    closeEditModal();
+    await loadTeachers();
+  } catch(e) { alert("儲存失敗："+e.message); }
+}
+
+// ── Delete ────────────────────────────────────────────────────
+function openDelete(t) {
+  deleteId = t.id;
+  document.getElementById("del-name").textContent = t.name;
+  document.getElementById("del-modal").classList.remove("hidden");
+}
+function closeDelModal() {
+  document.getElementById("del-modal").classList.add("hidden");
+  deleteId = null;
+}
+async function confirmDelete() {
+  if (!deleteId) return;
+  try {
+    await deleteDoc(doc(db,"teachers",deleteId));
+    closeDelModal();
+    await loadTeachers();
+  } catch(e) { alert("刪除失敗："+e.message); }
+}
+
+// ── Events ────────────────────────────────────────────────────
+document.getElementById("btn-add").addEventListener("click", openAdd);
+document.getElementById("modal-close").addEventListener("click", closeEditModal);
+document.getElementById("modal-cancel").addEventListener("click", closeEditModal);
+document.getElementById("modal-save").addEventListener("click", save);
+document.getElementById("edit-modal").addEventListener("click", e => {
+  if (e.target===e.currentTarget) closeEditModal();
+});
+document.getElementById("del-close").addEventListener("click",   closeDelModal);
+document.getElementById("del-cancel").addEventListener("click",  closeDelModal);
+document.getElementById("del-confirm").addEventListener("click", confirmDelete);
+["search-input","filter-gender","filter-status"].forEach(id =>
+  document.getElementById(id).addEventListener("input", renderCards));
+
+// admin guard
+setTimeout(() => {
+  if (!isAdmin()) {
+    document.getElementById("btn-add").style.display = "none";
+    document.querySelectorAll("[data-edit],[data-del]").forEach(b => b.style.display="none");
+  }
+}, 1500);
+
+// ── Init ─────────────────────────────────────────────────────
+await loadSettings();
+await loadTeachers();
+</script>
+</body>
+</html>
