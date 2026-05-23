@@ -20,31 +20,45 @@ export function initPasswordGate() {
   input.addEventListener("keydown", e => { if (e.key === "Enter") attempt(); });
 }
 
-// Detect if we're at root or in /pages/ subfolder
-function resolvePath(href, activePage) {
-  const inPages = window.location.pathname.includes("/pages/");
-  if (href.startsWith("../")) return inPages ? href : href.replace("../", "");
-  if (href.startsWith("pages/")) return inPages ? "../" + href.replace("pages/","") : href;
-  return href;
+// ── Detect if we are inside /pages/ subfolder ──────────────────
+function inPages() {
+  return window.location.pathname.includes("/pages/");
+}
+
+// Convert a "root-relative" path like "pages/foo.html" or "index.html"
+// to the correct href depending on whether we're in /pages/ or at root.
+function href(rootRelative) {
+  if (rootRelative === "index.html") {
+    return inPages() ? "../index.html" : "index.html";
+  }
+  // rootRelative is like "pages/sub-teachers.html"
+  if (inPages()) {
+    // strip the "pages/" prefix → just "sub-teachers.html"
+    return rootRelative.replace(/^pages\//, "");
+  }
+  return rootRelative;
 }
 
 export function initLayout(activePage) {
   initPasswordGate();
 
   const navItems = [
-    { id: "home",            label: "首頁",         icon: "🏠", href: "index.html",                 public: true },
-    { id: "query",           label: "查詢",         icon: "🔍", href: "pages/query.html",            public: true },
-    { id: "teachers",        label: "代課老師徵詢", icon: "👩‍🏫", href: "pages/teachers.html",         public: true },
-    { id: "salary-table",    label: "薪資費率表",   icon: "💰", href: "pages/salary-table.html",     public: true },
-    { id: "_div1",           label: "管理功能",     divider: true },
-    { id: "register",        label: "代課登記",     icon: "📝", href: "pages/register.html",         admin: true },
-    { id: "salary-calc",     label: "薪資計算",     icon: "🧮", href: "pages/salary-calc.html",      clerk: true },
-    { id: "insurance",       label: "加保管理",     icon: "🛡️",  href: "pages/insurance.html",        clerk: true },
-    { id: "_div2",           label: "資料管理",     divider: true },
-    { id: "sub-teachers",    label: "代課老師管理", icon: "👤", href: "pages/sub-teachers.html",     admin: true },
-    { id: "school-teachers", label: "校內老師管理", icon: "🏫", href: "pages/school-teachers.html",  admin: true },
-    { id: "overtime",        label: "超鐘點設定",   icon: "⏰", href: "pages/overtime.html",         admin: true },
-    { id: "settings",        label: "系統設定",     icon: "⚙️",  href: "pages/settings.html",         admin: true },
+    // public
+    { id: "home",             label: "首頁",         icon: "🏠", path: "index.html",                     public: true },
+    { id: "query",            label: "查詢",         icon: "🔍", path: "pages/query.html",               public: true },
+    { id: "teachers",         label: "代課老師徵詢", icon: "👩‍🏫", path: "pages/teachers.html",            public: true },
+    { id: "salary-table",     label: "薪資費率表",   icon: "💰", path: "pages/salary-table.html",        public: true },
+    // admin / clerk section
+    { divider: "管理功能" },
+    { id: "register",         label: "代課登記",     icon: "📝", path: "pages/register.html",            admin: true },
+    { id: "salary-calc",      label: "薪資計算",     icon: "🧮", path: "pages/salary-calc.html",         clerk: true },
+    { id: "insurance",        label: "加保管理",     icon: "🛡️",  path: "pages/insurance.html",           clerk: true },
+    // data section
+    { divider: "資料管理" },
+    { id: "sub-teachers",     label: "代課老師管理", icon: "👤", path: "pages/sub-teachers.html",        admin: true },
+    { id: "school-teachers",  label: "校內老師管理", icon: "🏫", path: "pages/school-teachers.html",     admin: true },
+    { id: "overtime",         label: "超鐘點設定",   icon: "⏰", path: "pages/overtime.html",            admin: true },
+    { id: "settings",         label: "系統設定",     icon: "⚙️",  path: "pages/settings.html",            admin: true },
   ];
 
   initAuth((user, role) => {
@@ -53,35 +67,31 @@ export function initLayout(activePage) {
     nav.innerHTML = "";
 
     navItems.forEach(item => {
+      // divider
       if (item.divider) {
         if (!user) return;
         const el = document.createElement("div");
         el.className = "nav-section-label";
-        el.textContent = item.label;
+        el.textContent = item.divider;
         nav.appendChild(el);
         return;
       }
-      if (item.admin && !isAdmin()) return;
-      if (item.clerk && !isClerk()) return;
+      // permission check
+      if (item.admin  && !isAdmin())  return;
+      if (item.clerk  && !isClerk())  return;
 
       const a = document.createElement("a");
       a.className = "nav-item" + (item.id === activePage ? " active" : "");
-      a.href = resolvePath(item.href, activePage);
-
-      // root-relative for index.html
-      if (item.id === "home") {
-        const inPages = window.location.pathname.includes("/pages/");
-        a.href = inPages ? "../index.html" : "index.html";
-      }
-
+      a.href = href(item.path);
       a.innerHTML = `<span class="icon">${item.icon}</span>${item.label}`;
       nav.appendChild(a);
     });
 
+    // Footer: login / user chip
     const footer = document.getElementById("sidebar-footer");
     if (!footer) return;
     if (user) {
-      const initials  = user.displayName ? user.displayName.slice(0,2) : "？";
+      const initials  = user.displayName ? user.displayName.slice(0, 2) : "？";
       const roleLabel = role === "admin" ? "管理者" : role === "clerk" ? "幹事" : "訪客";
       footer.innerHTML = `
         <div class="user-chip">
