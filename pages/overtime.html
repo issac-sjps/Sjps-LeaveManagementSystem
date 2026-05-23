@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>超鐘點設定｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.ot-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.ot-card {
+  background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius); padding:16px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.ot-card.has-ot { border-color:var(--warning); background:var(--warning-light); }
+.ot-header { display:flex; align-items:center; gap:10px; }
+.ot-avatar {
+  width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; flex-shrink:0;
+}
+.ot-avatar.male   { background:var(--primary-light); color:var(--primary); }
+.ot-avatar.female { background:#FBEAF0; color:var(--female); }
+
+.day-checks { display:flex; gap:6px; flex-wrap:wrap; }
+.day-check label {
+  display:flex; align-items:center; gap:4px; font-size:12px;
+  padding:3px 9px; border-radius:20px;
+  border:1px solid var(--gray-300); background:#fff;
+  cursor:pointer; transition:all 0.12s; user-select:none;
+}
+.day-check input[type=checkbox] { display:none; }
+.day-check.checked label { background:var(--warning-light); border-color:var(--warning); color:var(--warning); font-weight:500; }
+.save-indicator { font-size:11px; color:var(--success); display:none; }
+.save-indicator.show { display:inline; }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div>
+  <div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="school">高雄市左營區</div>
+      <div class="system">新莊國小代課系統</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">超鐘點設定</div>
+        <div class="topbar-sub">設定每位老師固定超鐘點的星期，代課登記時會自動提醒</div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="card" style="padding:14px;margin-bottom:16px;background:var(--warning-light);border-color:var(--warning)">
+        <div style="font-size:13px;color:var(--warning)">
+          ⚠ 勾選某老師在某星期有超鐘點後，代課登記時若該老師請假當天恰好是該星期，系統會自動在備註欄顯示紅色提醒，請管理者留意超鐘點費處理。
+        </div>
+      </div>
+      <div class="ot-grid" id="ot-grid">
+        <div class="text-muted text-sm">載入中…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { isAdmin } from "../js/auth.js";
+import { collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("overtime");
+
+const DOW_ZH = ["日","一","二","三","四","五","六"];
+let overtimeData = {}; // { teacherId: { days:[1,3] } }
+
+async function loadAll() {
+  const [stSnap, otSnap] = await Promise.all([
+    getDocs(collection(db,"schoolTeachers")),
+    getDocs(collection(db,"overtime")),
+  ]);
+  const teachers = stSnap.docs.map(d=>({id:d.id,...d.data()}));
+  overtimeData = {};
+  otSnap.docs.forEach(d=>{ overtimeData[d.id]={...d.data()}; });
+  renderGrid(teachers);
+}
+
+function renderGrid(teachers) {
+  const grid = document.getElementById("ot-grid");
+  grid.innerHTML = "";
+  if (!teachers.length) {
+    grid.innerHTML = `<div class="text-muted text-sm">尚無校內老師資料，請先至「校內老師管理」新增。</div>`;
+    return;
+  }
+  teachers.forEach(t => {
+    const days = overtimeData[t.id]?.days || [];
+    const hasOt = days.length > 0;
+
+    const card = document.createElement("div");
+    card.className = "ot-card" + (hasOt ? " has-ot" : "");
+
+    const checksHtml = [1,2,3,4,5].map(d => `
+      <div class="day-check${days.includes(d)?" checked":""}" data-val="${d}">
+        <label>
+          <input type="checkbox" value="${d}" ${days.includes(d)?"checked":""}>
+          <span>週${DOW_ZH[d]}</span>
+        </label>
+      </div>`).join("");
+
+    card.innerHTML = `
+      <div class="ot-header">
+        <div class="ot-avatar ${t.gender==="female"?"female":"male"}">${(t.name||"?").slice(0,2)}</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:${t.gender==="female"?"var(--female)":"var(--primary)"}">${t.name}</div>
+          <div class="text-xs text-muted">${t.className||""}${t.subject?` ／ ${t.subject}`:""}</div>
+        </div>
+        <span class="save-indicator" id="saved-${t.id}">✓ 已儲存</span>
+      </div>
+      <div>
+        <div class="text-xs text-muted" style="margin-bottom:6px">超鐘點星期（勾選後自動儲存）</div>
+        <div class="day-checks" id="checks-${t.id}">${checksHtml}</div>
+      </div>`;
+
+    // toggle logic
+    card.querySelectorAll(".day-check").forEach(dc => {
+      const cb = dc.querySelector("input");
+      cb.addEventListener("change", async () => {
+        dc.classList.toggle("checked", cb.checked);
+        // collect all checked days for this teacher
+        const allChecked = [...card.querySelectorAll(".day-check input:checked")]
+          .map(c=>Number(c.value));
+        card.classList.toggle("has-ot", allChecked.length > 0);
+        // auto-save
+        try {
+          await setDoc(doc(db,"overtime",t.id), { days: allChecked, updatedAt: new Date().toISOString() }, {merge:true});
+          const ind = document.getElementById(`saved-${t.id}`);
+          ind.classList.add("show");
+          setTimeout(()=>ind.classList.remove("show"), 2000);
+        } catch(e) { alert("儲存失敗："+e.message); }
+      });
+    });
+
+    grid.appendChild(card);
+  });
+}
+
+setTimeout(()=>{
+  if (!isAdmin()) {
+    document.querySelectorAll(".day-check input").forEach(c=>c.disabled=true);
+  }
+},1500);
+
+await loadAll();
+</script>
+</body>
+</html>

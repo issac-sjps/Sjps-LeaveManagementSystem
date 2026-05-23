@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代課登記｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.reg-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Record list ── */
+.rec-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; flex-wrap: wrap;
+}
+.rec-table-wrap { overflow-x: auto; }
+.rec-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.rec-table th {
+  background: var(--gray-50); color: var(--gray-600);
+  font-size: 11px; font-weight: 500; letter-spacing: 0.5px;
+  padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid var(--gray-200);
+  white-space: nowrap;
+}
+.rec-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+.rec-table tr:hover td { background: var(--gray-50); }
+.rec-table .actions { display: flex; gap: 6px; }
+
+.session-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.session-chip {
+  font-size: 10px; padding: 1px 6px; border-radius: 10px;
+  background: var(--gray-100); color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+}
+
+/* ── Form panel ── */
+.form-panel {
+  position: sticky; top: calc(var(--topbar-h) + 20px);
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: var(--radius); padding: 18px;
+}
+.form-panel-title {
+  font-size: 14px; font-weight: 600; color: var(--gray-800);
+  margin-bottom: 16px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* autocomplete */
+.autocomplete-wrap { position: relative; }
+.autocomplete-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+  background: #fff; border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  max-height: 200px; overflow-y: auto; display: none;
+}
+.autocomplete-list.show { display: block; }
+.ac-item {
+  padding: 8px 12px; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+  transition: background 0.1s;
+}
+.ac-item:hover { background: var(--gray-50); }
+.ac-item .ac-sub { font-size: 11px; color: var(--gray-500); margin-left: auto; }
+
+/* session selector */
+.session-sel {
+  display: grid; grid-template-columns: repeat(7,1fr); gap: 5px;
+}
+.ses-btn {
+  padding: 6px 2px; border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm); background: #fff;
+  font-size: 12px; font-weight: 500; color: var(--gray-600);
+  cursor: pointer; text-align: center; transition: all 0.12s;
+  user-select: none;
+}
+.ses-btn.selected { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* overtime alert */
+.overtime-alert {
+  display: none; background: var(--danger-light); color: var(--danger);
+  border-radius: var(--radius-sm); padding: 8px 12px;
+  font-size: 12px; margin-top: 6px; line-height: 1.5;
+}
+.overtime-alert.show { display: block; }
+
+/* wage preview */
+.wage-preview {
+  background: var(--success-light); border-radius: var(--radius-sm);
+  padding: 10px 14px; font-size: 13px; color: var(--success);
+  display: none; margin-top: 4px;
+}
+.wage-preview.show { display: block; }
+.wage-preview .wg-main { font-size: 16px; font-weight: 700; }
+.wage-preview .wg-detail { font-size: 11px; color: #555; margin-top: 2px; }
+
+.type-tabs { display: flex; gap: 0; margin-bottom: 12px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--gray-300); }
+.type-tab {
+  flex: 1; padding: 8px; text-align: center; font-size: 13px;
+  cursor: pointer; background: #fff; color: var(--gray-600);
+  border: none; transition: all 0.12s; font-family: var(--font);
+}
+.type-tab.active { background: var(--primary); color: #fff; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div>
+  <div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="school">高雄市左營區</div>
+      <div class="system">新莊國小代課系統</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">代課登記</div>
+        <div class="topbar-sub" id="rec-count">載入中…</div>
+      </div>
+      <div class="topbar-actions">
+        <input type="date" class="form-control" id="filter-date" style="width:160px">
+        <button class="btn btn-secondary btn-sm" id="btn-clear-filter">顯示全部</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="reg-layout">
+
+        <!-- Left: record list -->
+        <div class="card" style="padding:16px">
+          <div class="rec-toolbar">
+            <div style="font-size:13px;font-weight:500;color:var(--gray-700)" id="list-title">代課紀錄</div>
+          </div>
+          <div class="rec-table-wrap">
+            <table class="rec-table">
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th>請假老師</th>
+                  <th>假別</th>
+                  <th>代課老師</th>
+                  <th>班級</th>
+                  <th>類型</th>
+                  <th>節次</th>
+                  <th>經費</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="rec-tbody">
+                <tr><td colspan="9" class="text-muted text-sm" style="padding:20px">載入中…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Right: form -->
+        <div class="form-panel">
+          <div class="form-panel-title">
+            <span id="form-title-text">📝 新增代課紀錄</span>
+            <button class="btn btn-secondary btn-sm" id="btn-reset" style="margin-left:auto">清除</button>
+          </div>
+
+          <!-- 日期 -->
+          <div class="form-group">
+            <label class="form-label">日期 *</label>
+            <input class="form-control" id="f-date" type="date">
+          </div>
+
+          <!-- 請假老師 -->
+          <div class="form-group">
+            <label class="form-label">請假老師 *</label>
+            <div class="autocomplete-wrap">
+              <input class="form-control" id="f-absent" placeholder="輸入姓名搜尋…" autocomplete="off">
+              <div class="autocomplete-list" id="ac-absent"></div>
+            </div>
+            <input type="hidden" id="f-absent-id">
+            <div class="overtime-alert" id="overtime-alert"></div>
+          </div>
+
+          <!-- 假別 -->
+          <div class="form-group">
+            <label class="form-label">假別 *</label>
+            <select class="form-control form-select" id="f-leave-type">
+              <option value="">請選擇假別</option>
+              <option>公假</option>
+              <option>事假</option>
+              <option>病假</option>
+              <option>休假</option>
+              <option>婚假</option>
+              <option>喪假</option>
+              <option>娩假</option>
+              <option>身心調適假</option>
+              <option>其他</option>
+            </select>
+          </div>
+
+          <!-- 備註（假別說明） -->
+          <div class="form-group">
+            <label class="form-label">假別備註</label>
+            <input class="form-control" id="f-leave-note" placeholder="補充說明（選填）">
+          </div>
+
+          <!-- 經費來源 -->
+          <div class="form-group">
+            <label class="form-label">經費來源 *</label>
+            <select class="form-control form-select" id="f-fund">
+              <option value="">請選擇</option>
+              <option value="public">公費</option>
+              <option value="comp-public">補休（公費）</option>
+              <option value="comp-self">補休（自付）</option>
+              <option value="self">事病假（自付）</option>
+              <option value="pub-self">公假（自付）</option>
+              <option value="pub-pta">公假（家長會支付）</option>
+            </select>
+          </div>
+
+          <!-- 代課類型 -->
+          <div class="form-group">
+            <label class="form-label">代課類型 *</label>
+            <div class="type-tabs">
+              <button class="type-tab active" data-type="subject" id="tab-subject">代科任（鐘點）</button>
+              <button class="type-tab" data-type="homeroom" id="tab-homeroom">代導師班（日薪）</button>
+            </div>
+          </div>
+
+          <!-- 代課老師 -->
+          <div class="form-group">
+            <label class="form-label">代課老師 *</label>
+            <div class="autocomplete-wrap">
+              <input class="form-control" id="f-sub" placeholder="輸入姓名搜尋…" autocomplete="off">
+              <div class="autocomplete-list" id="ac-sub"></div>
+            </div>
+            <input type="hidden" id="f-sub-id">
+          </div>
+
+          <!-- 班級 -->
+          <div class="form-group">
+            <label class="form-label">代課班級 *</label>
+            <input class="form-control" id="f-class" placeholder="如：三年甲班">
+          </div>
+
+          <!-- 科目 -->
+          <div class="form-group">
+            <label class="form-label">授課科目</label>
+            <input class="form-control" id="f-subject" placeholder="如：數學">
+          </div>
+
+          <!-- 節次（代科任時顯示） -->
+          <div class="form-group" id="sessions-group">
+            <label class="form-label">節次 *（可多選）</label>
+            <div class="session-sel" id="session-sel">
+              <button class="ses-btn" data-ses="1">第1節</button>
+              <button class="ses-btn" data-ses="2">第2節</button>
+              <button class="ses-btn" data-ses="3">第3節</button>
+              <button class="ses-btn" data-ses="4">第4節</button>
+              <button class="ses-btn" data-ses="5">第5節</button>
+              <button class="ses-btn" data-ses="6">第6節</button>
+              <button class="ses-btn" data-ses="7">第7節</button>
+            </div>
+          </div>
+
+          <!-- 備註 -->
+          <div class="form-group">
+            <label class="form-label">備註</label>
+            <textarea class="form-control" id="f-notes" rows="2" placeholder="其他說明…"></textarea>
+          </div>
+
+          <!-- Wage preview -->
+          <div class="wage-preview" id="wage-preview">
+            <div class="wg-main" id="wg-main"></div>
+            <div class="wg-detail" id="wg-detail"></div>
+          </div>
+
+          <button class="btn btn-primary w-full" id="btn-save" style="margin-top:12px">儲存代課紀錄</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="modal-backdrop hidden" id="del-modal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">確認刪除</div>
+      <button class="modal-close" id="del-close">✕</button>
+    </div>
+    <p style="font-size:14px;color:var(--gray-700);margin-bottom:16px">
+      確定要刪除這筆代課紀錄？<br>
+      <span style="font-size:12px;color:var(--danger)">此操作無法復原。</span>
+    </p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" id="del-cancel">取消</button>
+      <button class="btn btn-danger" id="del-confirm">確認刪除</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { isAdmin, isClerk } from "../js/auth.js";
+import {
+  collection, getDocs, doc, getDoc, addDoc, setDoc, deleteDoc,
+  query, where, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("register");
+
+// ── State ─────────────────────────────────────────────────────
+let settings      = {};
+let salaryTable   = {};
+let homeroomFee   = {};
+let sessionFee    = 405;
+let allSchoolTeachers = []; // 校內老師（請假用）
+let allSubTeachers    = []; // 代課老師（含校內）
+let overtimeMap   = {};     // { teacherId: [1,3,5] } days of week
+let allRecords    = [];
+let editingId     = null;
+let deleteId      = null;
+let subType       = "subject"; // "subject" | "homeroom"
+let selectedSessions = new Set();
+
+const DOW_ZH  = ["日","一","二","三","四","五","六"];
+const FUND_LABELS = {
+  "public":     "公費",
+  "comp-public":"補休（公費）",
+  "comp-self":  "補休（自付）",
+  "self":       "事病假（自付）",
+  "pub-self":   "公假（自付）",
+  "pub-pta":    "公假（家長會）",
+};
+
+// ── Load data ─────────────────────────────────────────────────
+async function loadAll() {
+  const settSnap = await getDoc(doc(db, "settings", "main"));
+  if (settSnap.exists()) {
+    settings    = settSnap.data();
+    salaryTable = settings.salaryTable || {};
+    homeroomFee = settings.homeroomFee || {};
+    sessionFee  = settings.sessionFee  || 405;
+  }
+
+  const [stSnap, subSnap, otSnap, recSnap] = await Promise.all([
+    getDocs(collection(db, "schoolTeachers")),
+    getDocs(collection(db, "teachers")),
+    getDocs(collection(db, "overtime")),
+    getDocs(query(collection(db,"records"), orderBy("date","desc"))),
+  ]);
+
+  allSchoolTeachers = stSnap.docs.map(d=>({id:d.id,...d.data()}));
+  allSubTeachers    = [
+    ...subSnap.docs.map(d=>({id:d.id,...d.data(), isSchool:false})),
+    ...stSnap.docs.map(d=>({id:d.id,...d.data(), isSchool:true})),
+  ];
+  overtimeMap = {};
+  otSnap.docs.forEach(d => { overtimeMap[d.id] = d.data().days||[]; });
+  allRecords = recSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+  renderTable();
+}
+
+// ── Render table ──────────────────────────────────────────────
+function renderTable() {
+  const filterDate = document.getElementById("filter-date").value;
+  const recs = filterDate
+    ? allRecords.filter(r=>r.date===filterDate)
+    : allRecords;
+
+  document.getElementById("rec-count").textContent =
+    `共 ${allRecords.length} 筆${filterDate?" / 篩選後 "+recs.length+" 筆":""}`;
+  document.getElementById("list-title").textContent =
+    filterDate ? `${filterDate} 的代課紀錄` : "全部代課紀錄";
+
+  const tbody = document.getElementById("rec-tbody");
+  if (!recs.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-muted text-sm" style="padding:20px;text-align:center">目前沒有代課紀錄</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = "";
+  recs.forEach(r => {
+    const sesHtml = r.sessions?.length
+      ? `<div class="session-chips">${r.sessions.map(s=>`<span class="session-chip">第${s}節</span>`).join("")}</div>`
+      : "—";
+    const typeTag = r.subType==="homeroom"
+      ? `<span class="tag tag-amber">導師班</span>`
+      : `<span class="tag tag-blue">科任</span>`;
+    const fundTag = (r.fundType==="public"||r.fundType==="comp-public"||r.fundType==="pub-pta")
+      ? `<span class="tag tag-blue">${FUND_LABELS[r.fundType]||r.fundType}</span>`
+      : `<span class="tag tag-amber">${FUND_LABELS[r.fundType]||r.fundType}</span>`;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.date||"—"}</td>
+      <td><span class="name-male">${r.absentName||"—"}</span>${r.leaveType?`<br><span class="text-xs text-muted">${r.leaveType}</span>`:""}</td>
+      <td><span class="text-xs">${r.leaveType||"—"}</span></td>
+      <td>${r.subName||"—"}${r.isSchoolSub?'<br><span class="text-xs text-muted">校內</span>':""}</td>
+      <td>${r.className||"—"}</td>
+      <td>${typeTag}</td>
+      <td>${r.subType==="homeroom"?"日薪":sesHtml}</td>
+      <td>${fundTag}</td>
+      <td><div class="actions">
+        <button class="btn btn-secondary btn-sm" data-edit="${r.id}">編輯</button>
+        <button class="btn btn-danger btn-sm" data-del="${r.id}">刪除</button>
+      </div></td>`;
+    tr.querySelector("[data-edit]").addEventListener("click", ()=>loadEdit(r));
+    tr.querySelector("[data-del]").addEventListener("click",  ()=>openDelete(r.id));
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Autocomplete helper ────────────────────────────────────────
+function makeAutocomplete(inputId, listId, sourceArr, onSelect, nameKey="name") {
+  const input = document.getElementById(inputId);
+  const list  = document.getElementById(listId);
+
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    list.innerHTML = "";
+    if (!q) { list.classList.remove("show"); return; }
+    const matches = sourceArr.filter(t=>(t[nameKey]||"").toLowerCase().includes(q)).slice(0,8);
+    if (!matches.length) { list.classList.remove("show"); return; }
+    matches.forEach(t => {
+      const item = document.createElement("div");
+      item.className = "ac-item";
+      item.innerHTML = `<span>${t[nameKey]}</span><span class="ac-sub">${t.isSchool?"校內":"校外"}</span>`;
+      item.addEventListener("mousedown", e => {
+        e.preventDefault();
+        input.value = t[nameKey];
+        list.classList.remove("show");
+        onSelect(t);
+      });
+      list.appendChild(item);
+    });
+    list.classList.add("show");
+  });
+
+  input.addEventListener("blur", () => setTimeout(()=>list.classList.remove("show"),150));
+}
+
+// ── Overtime check ─────────────────────────────────────────────
+function checkOvertime(teacherId, dateStr) {
+  const alert = document.getElementById("overtime-alert");
+  if (!teacherId || !dateStr) { alert.classList.remove("show"); return; }
+  const date = new Date(dateStr + "T00:00:00");
+  const dow  = date.getDay();
+  const days = overtimeMap[teacherId] || [];
+  if (days.includes(dow)) {
+    const t = allSchoolTeachers.find(t=>t.id===teacherId);
+    alert.innerHTML = `⚠ <strong>${t?.name||""}</strong> 週${DOW_ZH[dow]}有超鐘點！代課請假當天需特別注意超鐘點處理。`;
+    alert.classList.add("show");
+  } else {
+    alert.classList.remove("show");
+  }
+}
+
+// ── Wage preview ──────────────────────────────────────────────
+function updateWagePreview() {
+  const preview   = document.getElementById("wage-preview");
+  const subTeacherId = document.getElementById("f-sub-id").value;
+  const dateStr   = document.getElementById("f-date").value;
+  if (!subTeacherId || !dateStr) { preview.classList.remove("show"); return; }
+
+  const teacher = allSubTeachers.find(t=>t.id===subTeacherId);
+  if (!teacher) { preview.classList.remove("show"); return; }
+
+  const year  = Number(dateStr.split("-")[0]);
+  const month = Number(dateStr.split("-")[1]);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const edu = salaryTable[teacher.eduCode];
+  if (!edu) { preview.classList.remove("show"); return; }
+
+  let total = 0, detail = "";
+
+  if (subType === "homeroom") {
+    const daily   = edu.daily?.[daysInMonth] || 0;
+    const homeFee = homeroomFee[daysInMonth] || 0;
+    total  = daily + homeFee;
+    detail = `日薪 ${daily.toLocaleString()} 元 ＋ 導師費 ${homeFee.toLocaleString()} 元（${daysInMonth}天月）`;
+  } else {
+    const count = selectedSessions.size;
+    if (!count) { preview.classList.remove("show"); return; }
+    total  = count * sessionFee;
+    detail = `${count} 節 × ${sessionFee} 元/節`;
+  }
+
+  document.getElementById("wg-main").textContent   = `預估薪資：${total.toLocaleString()} 元`;
+  document.getElementById("wg-detail").textContent = detail;
+  preview.classList.add("show");
+}
+
+// ── Session selector ──────────────────────────────────────────
+document.querySelectorAll(".ses-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const s = Number(btn.dataset.ses);
+    if (selectedSessions.has(s)) { selectedSessions.delete(s); btn.classList.remove("selected"); }
+    else { selectedSessions.add(s); btn.classList.add("selected"); }
+    updateWagePreview();
+  });
+});
+
+// ── Type tabs ─────────────────────────────────────────────────
+document.querySelectorAll(".type-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    subType = tab.dataset.type;
+    document.querySelectorAll(".type-tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("sessions-group").style.display =
+      subType === "subject" ? "" : "none";
+    updateWagePreview();
+  });
+});
+
+// ── Setup autocompletes ────────────────────────────────────────
+let selectedAbsentId = null;
+let selectedSubId    = null;
+
+makeAutocomplete("f-absent","ac-absent", allSchoolTeachers, t => {
+  selectedAbsentId = t.id;
+  document.getElementById("f-absent-id").value = t.id;
+  checkOvertime(t.id, document.getElementById("f-date").value);
+});
+
+makeAutocomplete("f-sub","ac-sub", allSubTeachers, t => {
+  selectedSubId = t.id;
+  document.getElementById("f-sub-id").value = t.id;
+  updateWagePreview();
+});
+
+document.getElementById("f-date").addEventListener("change", () => {
+  const abId = document.getElementById("f-absent-id").value;
+  if (abId) checkOvertime(abId, document.getElementById("f-date").value);
+  updateWagePreview();
+});
+
+// ── Reset form ────────────────────────────────────────────────
+function resetForm() {
+  editingId = null;
+  selectedAbsentId = null;
+  selectedSubId    = null;
+  selectedSessions = new Set();
+  document.getElementById("form-title-text").textContent = "📝 新增代課紀錄";
+  document.getElementById("f-date").value        = new Date().toISOString().slice(0,10);
+  document.getElementById("f-absent").value      = "";
+  document.getElementById("f-absent-id").value   = "";
+  document.getElementById("f-leave-type").value  = "";
+  document.getElementById("f-leave-note").value  = "";
+  document.getElementById("f-fund").value        = "";
+  document.getElementById("f-sub").value         = "";
+  document.getElementById("f-sub-id").value      = "";
+  document.getElementById("f-class").value       = "";
+  document.getElementById("f-subject").value     = "";
+  document.getElementById("f-notes").value       = "";
+  document.querySelectorAll(".ses-btn").forEach(b=>b.classList.remove("selected"));
+  document.getElementById("overtime-alert").classList.remove("show");
+  document.getElementById("wage-preview").classList.remove("show");
+  subType = "subject";
+  document.getElementById("tab-subject").classList.add("active");
+  document.getElementById("tab-homeroom").classList.remove("active");
+  document.getElementById("sessions-group").style.display = "";
+}
+
+function loadEdit(r) {
+  editingId = r.id;
+  document.getElementById("form-title-text").textContent = "✏️ 編輯代課紀錄";
+  document.getElementById("f-date").value       = r.date      || "";
+  document.getElementById("f-absent").value     = r.absentName|| "";
+  document.getElementById("f-absent-id").value  = r.absentId  || "";
+  document.getElementById("f-leave-type").value = r.leaveType || "";
+  document.getElementById("f-leave-note").value = r.leaveNote || "";
+  document.getElementById("f-fund").value       = r.fundType  || "";
+  document.getElementById("f-sub").value        = r.subName   || "";
+  document.getElementById("f-sub-id").value     = r.subTeacherId || "";
+  document.getElementById("f-class").value      = r.className || "";
+  document.getElementById("f-subject").value    = r.subject   || "";
+  document.getElementById("f-notes").value      = r.notes     || "";
+
+  subType = r.subType || "subject";
+  document.querySelectorAll(".type-tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.type === subType);
+  });
+  document.getElementById("sessions-group").style.display = subType==="subject"?"":"none";
+
+  selectedSessions = new Set(r.sessions||[]);
+  document.querySelectorAll(".ses-btn").forEach(b => {
+    b.classList.toggle("selected", selectedSessions.has(Number(b.dataset.ses)));
+  });
+
+  updateWagePreview();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+// ── Save ──────────────────────────────────────────────────────
+document.getElementById("btn-save").addEventListener("click", async () => {
+  const date      = document.getElementById("f-date").value;
+  const absentName= document.getElementById("f-absent").value.trim();
+  const absentId  = document.getElementById("f-absent-id").value;
+  const leaveType = document.getElementById("f-leave-type").value;
+  const fund      = document.getElementById("f-fund").value;
+  const subName   = document.getElementById("f-sub").value.trim();
+  const subId     = document.getElementById("f-sub-id").value;
+  const className = document.getElementById("f-class").value.trim();
+
+  if (!date||!absentName||!leaveType||!fund||!subName||!className) {
+    alert("請填寫所有必填欄位（日期、請假老師、假別、經費來源、代課老師、班級）");
+    return;
+  }
+  if (subType==="subject" && selectedSessions.size===0) {
+    alert("代科任請選擇至少一個節次");
+    return;
+  }
+
+  const subTeacher = allSubTeachers.find(t=>t.id===subId);
+  const daysInMonth = new Date(Number(date.split("-")[0]), Number(date.split("-")[1]), 0).getDate();
+  const edu = salaryTable[subTeacher?.eduCode];
+
+  let wage = 0;
+  if (subType==="homeroom") {
+    wage = (edu?.daily?.[daysInMonth]||0) + (homeroomFee[daysInMonth]||0);
+  } else {
+    wage = selectedSessions.size * sessionFee;
+  }
+
+  const data = {
+    date,
+    absentName,
+    absentId:     absentId  || null,
+    leaveType,
+    leaveNote:    document.getElementById("f-leave-note").value.trim(),
+    fundType:     fund,
+    subType,
+    subTeacherId: subId     || null,
+    subName,
+    isSchoolSub:  subTeacher?.isSchool || false,
+    className,
+    subject:      document.getElementById("f-subject").value.trim(),
+    sessions:     subType==="subject" ? [...selectedSessions].sort((a,b)=>a-b) : [],
+    notes:        document.getElementById("f-notes").value.trim(),
+    wage,
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    if (editingId) {
+      await setDoc(doc(db,"records",editingId), data, {merge:true});
+    } else {
+      data.createdAt = new Date().toISOString();
+      await addDoc(collection(db,"records"), data);
+    }
+    resetForm();
+    await loadAll();
+  } catch(e) { alert("儲存失敗："+e.message); }
+});
+
+// ── Delete ────────────────────────────────────────────────────
+function openDelete(id) {
+  deleteId = id;
+  document.getElementById("del-modal").classList.remove("hidden");
+}
+document.getElementById("del-close").addEventListener("click",   ()=>document.getElementById("del-modal").classList.add("hidden"));
+document.getElementById("del-cancel").addEventListener("click",  ()=>document.getElementById("del-modal").classList.add("hidden"));
+document.getElementById("del-confirm").addEventListener("click", async ()=>{
+  if (!deleteId) return;
+  try {
+    await deleteDoc(doc(db,"records",deleteId));
+    document.getElementById("del-modal").classList.add("hidden");
+    deleteId = null;
+    await loadAll();
+  } catch(e) { alert("刪除失敗："+e.message); }
+});
+
+// ── Filter ────────────────────────────────────────────────────
+document.getElementById("filter-date").addEventListener("change", renderTable);
+document.getElementById("btn-clear-filter").addEventListener("click", ()=>{
+  document.getElementById("filter-date").value="";
+  renderTable();
+});
+document.getElementById("btn-reset").addEventListener("click", resetForm);
+
+// ── Admin guard ───────────────────────────────────────────────
+setTimeout(()=>{
+  if (!isAdmin()) {
+    document.getElementById("form-panel")?.style && (document.querySelector(".form-panel").style.display="none");
+  }
+}, 1500);
+
+// ── Init ─────────────────────────────────────────────────────
+resetForm();
+await loadAll();
+</script>
+</body>
+</html>

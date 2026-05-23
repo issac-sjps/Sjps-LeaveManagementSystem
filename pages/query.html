@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>查詢｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.query-layout { display:grid; grid-template-columns:280px 1fr; gap:16px; align-items:start; }
+.filter-panel { position:sticky; top:calc(var(--topbar-h) + 20px); }
+
+.result-table { width:100%; border-collapse:collapse; font-size:13px; }
+.result-table th { background:var(--gray-50); color:var(--gray-600); font-size:11px; font-weight:500; padding:8px 12px; text-align:left; border-bottom:1px solid var(--gray-200); white-space:nowrap; }
+.result-table td { padding:10px 12px; border-bottom:1px solid var(--gray-100); vertical-align:middle; }
+.result-table tr:hover td { background:var(--gray-50); }
+
+.stat-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.stat-card { background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius); padding:12px 16px; flex:1; min-width:120px; }
+.stat-num { font-size:22px; font-weight:700; color:var(--primary); }
+.stat-label { font-size:11px; color:var(--gray-500); margin-top:2px; }
+
+.session-chips { display:flex; flex-wrap:wrap; gap:3px; }
+.session-chip { font-size:10px; padding:1px 6px; border-radius:10px; background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+
+.avail-list { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+.avail-item { display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--success-light); border-radius:var(--radius-sm); font-size:13px; }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div>
+  <div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="school">高雄市左營區</div>
+      <div class="system">新莊國小代課系統</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">代課查詢</div>
+        <div class="topbar-sub" id="result-count">請輸入查詢條件</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-reset">清除條件</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="query-layout">
+
+        <!-- Filter panel -->
+        <div class="filter-panel card" style="padding:16px">
+          <div class="card-title">🔍 查詢條件</div>
+
+          <div class="form-group">
+            <label class="form-label">起始日期</label>
+            <input class="form-control" id="f-from" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">結束日期</label>
+            <input class="form-control" id="f-to" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">請假老師姓名</label>
+            <input class="form-control" id="f-absent" placeholder="輸入姓名（部分符合）">
+          </div>
+          <div class="form-group">
+            <label class="form-label">代課老師姓名</label>
+            <input class="form-control" id="f-sub" placeholder="輸入姓名（部分符合）">
+          </div>
+          <div class="form-group">
+            <label class="form-label">假別</label>
+            <select class="form-control form-select" id="f-leave">
+              <option value="">全部假別</option>
+              <option>公假</option><option>事假</option><option>病假</option>
+              <option>休假</option><option>婚假</option><option>喪假</option>
+              <option>娩假</option><option>身心調適假</option><option>其他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">代課類型</label>
+            <select class="form-control form-select" id="f-type">
+              <option value="">全部類型</option>
+              <option value="subject">代科任</option>
+              <option value="homeroom">代導師班</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">經費來源</label>
+            <select class="form-control form-select" id="f-fund">
+              <option value="">全部</option>
+              <option value="public">公費</option>
+              <option value="self">自費相關</option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary w-full" id="btn-search">查詢</button>
+
+          <!-- Available teachers for a date -->
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-200)">
+            <div class="card-title">📅 查指定日可用老師</div>
+            <div class="form-group">
+              <input class="form-control" id="f-avail-date" type="date" placeholder="選擇日期">
+            </div>
+            <button class="btn btn-secondary w-full" id="btn-avail">查詢可用老師</button>
+            <div id="avail-result" style="margin-top:10px"></div>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div>
+          <div class="stat-row" id="stat-row" style="display:none">
+            <div class="stat-card">
+              <div class="stat-num" id="stat-total">0</div>
+              <div class="stat-label">代課總筆數</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num" id="stat-sessions">0</div>
+              <div class="stat-label">總節數（科任）</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num" id="stat-days">0</div>
+              <div class="stat-label">總日數（導師班）</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num" id="stat-wage">0</div>
+              <div class="stat-label">預估總薪資（元）</div>
+            </div>
+          </div>
+
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table class="result-table">
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>請假老師</th>
+                    <th>假別</th>
+                    <th>代課老師</th>
+                    <th>班級</th>
+                    <th>科目</th>
+                    <th>類型</th>
+                    <th>節次</th>
+                    <th>經費</th>
+                    <th>預估薪資</th>
+                  </tr>
+                </thead>
+                <tbody id="result-tbody">
+                  <tr><td colspan="10" class="text-muted text-sm" style="padding:24px;text-align:center">請設定條件後點擊「查詢」</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("query");
+
+const DOW_ZH = ["日","一","二","三","四","五","六"];
+const FUND_LABELS = {
+  "public":"公費","comp-public":"補休（公費）","comp-self":"補休（自付）",
+  "self":"事病假（自付）","pub-self":"公假（自付）","pub-pta":"公假（家長會）",
+};
+
+let allTeachers = [];
+
+async function loadTeachers() {
+  const snap = await getDocs(collection(db,"teachers"));
+  allTeachers = snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+// ── Search ────────────────────────────────────────────────────
+async function doSearch() {
+  const from    = document.getElementById("f-from").value;
+  const to      = document.getElementById("f-to").value;
+  const absent  = document.getElementById("f-absent").value.trim().toLowerCase();
+  const sub     = document.getElementById("f-sub").value.trim().toLowerCase();
+  const leave   = document.getElementById("f-leave").value;
+  const type    = document.getElementById("f-type").value;
+  const fund    = document.getElementById("f-fund").value;
+
+  let q = collection(db,"records");
+  let constraints = [orderBy("date","desc")];
+  if (from) constraints.push(where("date",">=",from));
+  if (to)   constraints.push(where("date","<=",to));
+
+  const snap = await getDocs(query(q, ...constraints));
+  let recs = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+  // client-side filters
+  if (absent) recs = recs.filter(r=>r.absentName?.toLowerCase().includes(absent));
+  if (sub)    recs = recs.filter(r=>r.subName?.toLowerCase().includes(sub));
+  if (leave)  recs = recs.filter(r=>r.leaveType===leave);
+  if (type)   recs = recs.filter(r=>r.subType===type);
+  if (fund==="self") recs = recs.filter(r=>!["public","comp-public","pub-pta"].includes(r.fundType));
+  else if (fund) recs = recs.filter(r=>r.fundType===fund);
+
+  renderResults(recs);
+}
+
+function renderResults(recs) {
+  document.getElementById("result-count").textContent = `共 ${recs.length} 筆結果`;
+
+  // stats
+  const totalSessions = recs.filter(r=>r.subType==="subject").reduce((s,r)=>(s+(r.sessions?.length||0)),0);
+  const totalDays     = recs.filter(r=>r.subType==="homeroom").length;
+  const totalWage     = recs.reduce((s,r)=>s+(r.wage||0),0);
+  document.getElementById("stat-total").textContent    = recs.length;
+  document.getElementById("stat-sessions").textContent = totalSessions;
+  document.getElementById("stat-days").textContent     = totalDays;
+  document.getElementById("stat-wage").textContent     = totalWage.toLocaleString();
+  document.getElementById("stat-row").style.display    = recs.length ? "" : "none";
+
+  const tbody = document.getElementById("result-tbody");
+  if (!recs.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="text-muted text-sm" style="padding:24px;text-align:center">查無符合結果</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = "";
+  recs.forEach(r => {
+    const sesHtml = r.sessions?.length
+      ? `<div class="session-chips">${r.sessions.map(s=>`<span class="session-chip">第${s}節</span>`).join("")}</div>`
+      : "—";
+    const typeTag = r.subType==="homeroom"
+      ? `<span class="tag tag-amber">導師班</span>`
+      : `<span class="tag tag-blue">科任</span>`;
+    const isSelf = !["public","comp-public","pub-pta"].includes(r.fundType);
+    const fundTag = `<span class="tag ${isSelf?"tag-amber":"tag-blue"}">${FUND_LABELS[r.fundType]||r.fundType||"—"}</span>`;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="white-space:nowrap">${r.date||"—"}</td>
+      <td>${r.absentName||"—"}</td>
+      <td class="text-sm">${r.leaveType||"—"}</td>
+      <td>${r.subName||"—"}${r.isSchoolSub?'<span class="tag tag-gray" style="margin-left:4px;font-size:9px">校內</span>':""}</td>
+      <td>${r.className||"—"}</td>
+      <td>${r.subject||"—"}</td>
+      <td>${typeTag}</td>
+      <td>${r.subType==="homeroom"?"日薪":sesHtml}</td>
+      <td>${fundTag}</td>
+      <td style="font-weight:500;color:var(--primary)">${r.wage?r.wage.toLocaleString()+"元":"—"}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Available teachers ─────────────────────────────────────────
+async function checkAvailable() {
+  const dateStr = document.getElementById("f-avail-date").value;
+  if (!dateStr) { alert("請選擇日期"); return; }
+
+  const date = new Date(dateStr+"T00:00:00");
+  const dow  = date.getDay();
+
+  const snap = await getDocs(query(collection(db,"records"), where("date","==",dateStr)));
+  const busyIds = new Set(snap.docs.map(d=>d.data().subTeacherId).filter(Boolean));
+
+  const available = allTeachers.filter(t => {
+    if (busyIds.has(t.id)) return false;
+    if (t.blockedDays?.includes(dow)) return false;
+    if (t.disabledFrom && t.disabledTo && dateStr>=t.disabledFrom && dateStr<=t.disabledTo) return false;
+    return true;
+  });
+
+  const div = document.getElementById("avail-result");
+  if (!available.length) {
+    div.innerHTML = `<div class="text-muted text-sm">該日無可用代課老師</div>`;
+    return;
+  }
+  div.innerHTML = `
+    <div class="text-xs text-muted" style="margin-bottom:4px">${dateStr}（週${DOW_ZH[dow]}）可用 ${available.length} 位：</div>
+    <div class="avail-list">
+      ${available.map(t=>`
+        <div class="avail-item">
+          <span class="light light-green"></span>
+          <span class="${t.gender==="female"?"name-female":"name-male"}">${t.name}</span>
+          <span class="text-xs text-muted ml-auto">${t.subjects||""}</span>
+        </div>`).join("")}
+    </div>`;
+}
+
+// ── Events ─────────────────────────────────────────────────────
+document.getElementById("btn-search").addEventListener("click", doSearch);
+document.getElementById("btn-avail").addEventListener("click", checkAvailable);
+document.getElementById("btn-reset").addEventListener("click", ()=>{
+  ["f-from","f-to","f-absent","f-sub","f-avail-date"].forEach(id=>document.getElementById(id).value="");
+  ["f-leave","f-type","f-fund"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("result-tbody").innerHTML=`<tr><td colspan="10" class="text-muted text-sm" style="padding:24px;text-align:center">請設定條件後點擊「查詢」</td></tr>`;
+  document.getElementById("result-count").textContent="請輸入查詢條件";
+  document.getElementById("stat-row").style.display="none";
+  document.getElementById("avail-result").innerHTML="";
+});
+
+// default date range: this month
+const now = new Date();
+const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0");
+document.getElementById("f-from").value = `${y}-${m}-01`;
+document.getElementById("f-to").value   = `${y}-${m}-${new Date(y,now.getMonth()+1,0).getDate()}`;
+document.getElementById("f-avail-date").value = now.toISOString().slice(0,10);
+
+await loadTeachers();
+</script>
+</body>
+</html>
