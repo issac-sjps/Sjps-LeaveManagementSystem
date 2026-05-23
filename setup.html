@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>系統初始化</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+  .log { background: #f5f5f5; padding: 16px; border-radius: 8px; margin-top: 16px; font-size: 13px; line-height: 2; }
+  .ok { color: #3B6D11; } .err { color: #A32D2D; }
+  button { padding: 10px 20px; background: #185FA5; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+</style>
+</head>
+<body>
+<h2>新莊國小代課系統 — 初始化</h2>
+<p style="color:#666;font-size:13px">此頁面用於首次建立 Firebase 資料。請先以 Google 登入，再執行初始化。</p>
+<button id="btn-login">Google 登入</button>
+<button id="btn-init" style="display:none;margin-left:8px">執行初始化</button>
+<div class="log" id="log">等待登入…</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyACy13Fswrf6BMYC6iQ1ri2O352JL3uC2w",
+  authDomain: "sjps-leavemanagementsystem.firebaseapp.com",
+  projectId: "sjps-leavemanagementsystem",
+  storageBucket: "sjps-leavemanagementsystem.firebasestorage.app",
+  messagingSenderId: "383780552116",
+  appId: "1:383780552116:web:b556b8a6e81382c31f06e1"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+const log = document.getElementById("log");
+
+function addLog(msg, ok = true) {
+  log.innerHTML += `<div class="${ok ? "ok" : "err"}">${msg}</div>`;
+}
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    log.innerHTML = `<div class="ok">已登入：${user.email}</div>`;
+    document.getElementById("btn-login").style.display = "none";
+    document.getElementById("btn-init").style.display = "";
+  } else {
+    log.innerHTML = "等待登入…";
+    document.getElementById("btn-login").style.display = "";
+    document.getElementById("btn-init").style.display = "none";
+  }
+});
+
+document.getElementById("btn-login").onclick = () => signInWithPopup(auth, provider);
+
+document.getElementById("btn-init").onclick = async () => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // 1. 寫入管理員帳號
+  try {
+    await setDoc(doc(db, "accounts", user.uid), {
+      email: user.email,
+      displayName: user.displayName,
+      role: "admin",
+      createdAt: new Date().toISOString()
+    });
+    addLog(`✅ 管理員帳號建立：${user.email}`);
+  } catch(e) { addLog(`❌ 帳號建立失敗：${e.message}`, false); }
+
+  // 2. 寫入系統設定
+  try {
+    const settingsRef = doc(db, "settings", "main");
+    const exists = await getDoc(settingsRef);
+    if (!exists.exists()) {
+      await setDoc(settingsRef, {
+        schoolName: "高雄市左營區新莊國小",
+        semesterStart: "2025-02-10",
+        semesterEnd: "2025-06-27",
+        sessionFee: 405,
+        password: "073411373",
+        sessions: [
+          { no: 1, start: "08:40", end: "09:20" },
+          { no: 2, start: "09:30", end: "10:10" },
+          { no: 3, start: "10:30", end: "11:10" },
+          { no: 4, start: "11:20", end: "12:00" },
+          { no: 5, start: "13:30", end: "14:10" },
+          { no: 6, start: "14:20", end: "15:00" },
+          { no: 7, start: "15:15", end: "15:55" },
+        ],
+        // 導師費 依當月天數
+        homeroomFee: { 28: 129, 29: 133, 30: 138, 31: 143 },
+        // 費率表（學歷代號 1-6）
+        salaryTable: {
+          1: { label: "碩士畢／有合格教師證", grade: 245, base: 29270, research: 26560,
+               daily: { 28: 1801, 29: 1925, 30: 1861, 31: 1994 } },
+          2: { label: "碩士畢／無合格教師證", grade: 245, base: 29270, research: 21248,
+               daily: { 28: 1553, 29: 1742, 30: 1684, 31: 1804 } },
+          3: { label: "大學畢／有合格教師證（檢定）", grade: 190, base: 25050, research: 23080,
+               daily: { 28: 1553, 29: 1660, 30: 1604, 31: 1719 } },
+          4: { label: "大學畢／有合格教師證（登記）", grade: 180, base: 24290, research: 23080,
+               daily: { 28: 1528, 29: 1633, 30: 1579, 31: 1692 } },
+          5: { label: "大學畢／已修畢師資課程，無合格教師證", grade: 180, base: 24290, research: 18464,
+               daily: { 28: 1379, 29: 1474, 30: 1425, 31: 1527 } },
+          6: { label: "大學畢／未修畢師資課程，無合格教師證", grade: 170, base: 23520, research: 18464,
+               daily: { 28: 1354, 29: 1448, 30: 1399, 31: 1499 } },
+        }
+      });
+      addLog("✅ 系統設定寫入完成");
+    } else {
+      addLog("ℹ️ 系統設定已存在，跳過");
+    }
+  } catch(e) { addLog(`❌ 設定寫入失敗：${e.message}`, false); }
+
+  addLog("🎉 初始化完成！可以關閉此頁面，前往 index.html 開始使用。");
+};
+</script>
+</body>
+</html>

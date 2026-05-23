@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代課管理系統｜新莊國小</title>
+<link rel="stylesheet" href="css/main.css">
+<style>
+.home-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Teacher sidebar ── */
+.teacher-panel { position: sticky; top: calc(var(--topbar-h) + 20px); }
+.teacher-list { display: flex; flex-direction: column; gap: 4px; max-height: calc(100vh - 180px); overflow-y: auto; }
+.teacher-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  position: relative;
+}
+.teacher-row:hover { background: var(--gray-50); border-color: var(--gray-200); }
+.teacher-row.has-class { background: var(--success-light); }
+.teacher-row.unavailable { opacity: 0.45; }
+.teacher-name { font-size: 13px; font-weight: 500; flex: 1; }
+.teacher-meta { font-size: 10px; color: var(--gray-500); }
+.teacher-today { font-size: 10px; color: var(--success); }
+.filter-bar {
+  display: flex; gap: 6px; align-items: center;
+  margin-bottom: 10px; flex-wrap: wrap;
+}
+.filter-toggle {
+  font-size: 11px; padding: 3px 8px; border-radius: 20px;
+  border: 1px solid var(--gray-300); background: #fff;
+  cursor: pointer; color: var(--gray-600);
+  transition: all 0.12s;
+}
+.filter-toggle.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+
+/* ── Week calendar ── */
+.cal-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px;
+}
+.cal-nav {
+  display: flex; gap: 4px;
+}
+.cal-nav button {
+  padding: 5px 10px; border: 1px solid var(--gray-300);
+  background: #fff; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 13px; color: var(--gray-700);
+  transition: background 0.12s;
+}
+.cal-nav button:hover { background: var(--gray-100); }
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.cal-grid.has-saturday { grid-template-columns: repeat(6, 1fr); }
+.cal-day {
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: var(--radius); padding: 10px;
+  min-height: 130px; cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cal-day:hover { border-color: var(--primary-mid); box-shadow: 0 2px 8px rgba(24,95,165,0.08); }
+.cal-day.today { border-color: var(--primary); }
+.cal-day.today .cal-date { color: var(--primary); font-weight: 700; }
+.cal-day.past { background: var(--gray-50); }
+.cal-day.has-records { }
+.cal-dow { font-size: 11px; color: var(--gray-400); font-weight: 500; }
+.cal-date { font-size: 18px; font-weight: 600; color: var(--gray-800); line-height: 1; }
+.cal-records { flex: 1; display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.cal-record {
+  background: var(--primary-light); border-radius: 4px;
+  padding: 3px 6px; font-size: 10px; color: var(--primary);
+  line-height: 1.3; display: flex; gap: 3px; align-items: flex-start;
+}
+.cal-record .arrow { opacity: 0.5; flex-shrink: 0; }
+.cal-more {
+  font-size: 10px; color: var(--gray-500);
+  padding: 2px 4px; text-align: center;
+}
+
+/* ── Detail modal ── */
+.detail-records { display: flex; flex-direction: column; gap: 10px; }
+.detail-record {
+  border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+  padding: 12px;
+}
+.detail-row { display: flex; gap: 8px; margin-bottom: 4px; font-size: 13px; }
+.detail-label { color: var(--gray-500); min-width: 60px; flex-shrink: 0; }
+.detail-val { color: var(--gray-900); }
+.node-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.node-chip {
+  font-size: 10px; padding: 2px 7px; border-radius: 20px;
+  background: var(--gray-100); color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+}
+
+/* ── Teacher popup ── */
+.teacher-popup {
+  position: fixed; z-index: 300;
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: var(--radius); padding: 16px;
+  width: 260px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  display: none;
+}
+.popup-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.popup-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; flex-shrink: 0;
+}
+.popup-avatar.male { background: var(--primary-light); color: var(--primary); }
+.popup-avatar.female { background: #FBEAF0; color: var(--female); }
+.popup-name { font-size: 15px; font-weight: 600; }
+.popup-field { display: flex; gap: 6px; font-size: 12px; padding: 3px 0; }
+.popup-field .lbl { color: var(--gray-500); min-width: 50px; flex-shrink: 0; }
+.popup-field .val { color: var(--gray-800); }
+.popup-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--gray-100); }
+.popup-section-title { font-size: 10px; color: var(--gray-400); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; }
+.upcoming-dates { display: flex; flex-wrap: wrap; gap: 4px; }
+.upcoming-date { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--primary-light); color: var(--primary); }
+.restriction-note { font-size: 11px; color: var(--warning); background: var(--warning-light); padding: 4px 8px; border-radius: 4px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- Password screen -->
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div>
+  <div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<!-- App layout -->
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="school">高雄市左營區</div>
+      <div class="system">新莊國小代課系統</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">代課總覽</div>
+        <div class="topbar-sub" id="topbar-week"></div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-today">回到本週</button>
+        <a href="pages/register.html" class="btn btn-primary btn-sm" id="btn-register" style="display:none">＋ 新增代課</a>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="home-grid">
+
+        <!-- Left: Teacher list -->
+        <div class="teacher-panel card" style="padding:14px;">
+          <div class="card-title">👩‍🏫 代課老師名單</div>
+          <div class="filter-bar">
+            <button class="filter-toggle active" id="toggle-hide-busy">隱藏今日已代課</button>
+          </div>
+          <div class="teacher-list" id="teacher-list">
+            <div class="text-muted text-sm" style="padding:8px">載入中…</div>
+          </div>
+        </div>
+
+        <!-- Right: Calendar -->
+        <div>
+          <div class="cal-header">
+            <div class="cal-nav">
+              <button id="btn-prev">‹ 上週</button>
+              <button id="btn-next">下週 ›</button>
+            </div>
+            <div style="font-size:13px;color:var(--gray-600)" id="week-range"></div>
+          </div>
+          <div class="cal-grid" id="cal-grid">
+            <!-- days injected by JS -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Day detail modal -->
+<div class="modal-backdrop hidden" id="day-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="day-modal-title">代課詳情</div>
+      <button class="modal-close" id="day-modal-close">✕</button>
+    </div>
+    <div class="detail-records" id="day-modal-body">
+    </div>
+  </div>
+</div>
+
+<!-- Teacher popup -->
+<div class="teacher-popup" id="teacher-popup"></div>
+
+<script type="module">
+import { initLayout } from "./js/layout.js";
+import { db } from "./js/firebase-config.js";
+import { isAdmin, isClerk, currentRole } from "./js/auth.js";
+import {
+  collection, query, where, getDocs, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── Init ───────────────────────────────────────────────────────
+initLayout("home");
+
+// ── Date helpers ───────────────────────────────────────────────
+const DAYS = ["日","一","二","三","四","五","六"];
+const MONTHS = ["1","2","3","4","5","6","7","8","9","10","11","12"];
+
+function toYMD(d) {
+  return d.getFullYear() + "-" +
+    String(d.getMonth()+1).padStart(2,"0") + "-" +
+    String(d.getDate()).padStart(2,"0");
+}
+function parseYMD(s) {
+  const [y,m,d] = s.split("-").map(Number);
+  return new Date(y, m-1, d);
+}
+function addDays(d, n) {
+  const r = new Date(d); r.setDate(r.getDate()+n); return r;
+}
+function getMondayOf(d) {
+  const r = new Date(d);
+  const dow = r.getDay(); // 0=Sun
+  const diff = dow === 0 ? -6 : 1 - dow;
+  r.setDate(r.getDate() + diff);
+  return r;
+}
+
+// ── State ──────────────────────────────────────────────────────
+let weekStart = getMondayOf(new Date());
+let hideBusy = true;
+let allTeachers = [];
+let recordsByDate = {}; // { "2025-05-19": [...] }
+let todayBusy = new Set(); // teacher ids busy today
+
+// ── Fetch teachers ─────────────────────────────────────────────
+async function fetchTeachers() {
+  const snap = await getDocs(collection(db, "teachers"));
+  allTeachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ── Fetch records for current week (+ nearby) ──────────────────
+async function fetchRecords() {
+  const from = toYMD(addDays(weekStart, -1));
+  const to = toYMD(addDays(weekStart, 6));
+  const q = query(
+    collection(db, "records"),
+    where("date", ">=", from),
+    where("date", "<=", to)
+  );
+  const snap = await getDocs(q);
+  recordsByDate = {};
+  snap.docs.forEach(d => {
+    const rec = { id: d.id, ...d.data() };
+    if (!recordsByDate[rec.date]) recordsByDate[rec.date] = [];
+    recordsByDate[rec.date].push(rec);
+  });
+}
+
+// ── Fetch upcoming dates for each teacher (for popup) ──────────
+async function fetchUpcomingForTeacher(teacherId) {
+  const today = toYMD(new Date());
+  const q = query(
+    collection(db, "records"),
+    where("subTeacherId", "==", teacherId),
+    where("date", ">=", today),
+    orderBy("date")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data().date);
+}
+
+// ── Render teacher list ────────────────────────────────────────
+function renderTeachers() {
+  const todayStr = toYMD(new Date());
+  todayBusy = new Set(
+    (recordsByDate[todayStr] || []).map(r => r.subTeacherId)
+  );
+
+  const list = document.getElementById("teacher-list");
+  const today = new Date();
+  const todayDow = today.getDay(); // 0=Sun,1=Mon...
+
+  const visible = allTeachers.filter(t => {
+    // hide if in disabled period
+    if (t.disabledFrom && t.disabledTo) {
+      if (todayStr >= t.disabledFrom && todayStr <= t.disabledTo) return false;
+    }
+    // hide if today is a blocked weekday
+    if (t.blockedDays && t.blockedDays.includes(todayDow)) return false;
+    // if toggle on, hide busy
+    if (hideBusy && todayBusy.has(t.id)) return false;
+    return true;
+  });
+
+  if (visible.length === 0) {
+    list.innerHTML = `<div class="text-muted text-sm" style="padding:8px">目前無可聯絡的代課老師</div>`;
+    return;
+  }
+
+  list.innerHTML = "";
+  visible.forEach(t => {
+    const busy = todayBusy.has(t.id);
+    const div = document.createElement("div");
+    div.className = "teacher-row" + (busy ? " has-class" : "");
+    const nameClass = t.gender === "female" ? "name-female" : "name-male";
+    const light = busy ? "light-green" : "light-gray";
+    const todayRec = (recordsByDate[todayStr] || []).find(r => r.subTeacherId === t.id);
+    div.innerHTML = `
+      <span class="light ${light}"></span>
+      <div style="flex:1;min-width:0">
+        <div class="teacher-name ${nameClass}">${t.name}</div>
+        ${busy && todayRec
+          ? `<div class="teacher-today">▸ ${todayRec.className || ""}</div>`
+          : `<div class="teacher-meta">${t.subjects || "—"}</div>`}
+      </div>`;
+    div.addEventListener("click", (e) => showTeacherPopup(e, t));
+    list.appendChild(div);
+  });
+}
+
+// ── Teacher popup ──────────────────────────────────────────────
+async function showTeacherPopup(e, t) {
+  const popup = document.getElementById("teacher-popup");
+  const today = new Date();
+  const todayDow = today.getDay();
+  const todayStr = toYMD(today);
+
+  const upcoming = await fetchUpcomingForTeacher(t.id);
+
+  const dayNames = ["日","一","二","三","四","五","六"];
+  const blockedText = t.blockedDays && t.blockedDays.length
+    ? "每週" + t.blockedDays.map(d => dayNames[d]).join("、") + " 不可代課"
+    : "";
+  const disabledText = (t.disabledFrom && t.disabledTo)
+    ? `${t.disabledFrom} ～ ${t.disabledTo} 停用中`
+    : "";
+
+  const avatarClass = t.gender === "female" ? "female" : "male";
+  const nameClass = t.gender === "female" ? "name-female" : "name-male";
+  const initials = t.name.slice(0,2);
+
+  popup.innerHTML = `
+    <div class="popup-header">
+      <div class="popup-avatar ${avatarClass}">${initials}</div>
+      <div>
+        <div class="popup-name ${nameClass}">${t.name}</div>
+        <div class="text-xs text-muted">${t.eduLabel || ""} ／ ${t.dailyWage ? t.dailyWage+"元/日" : ""}</div>
+      </div>
+    </div>
+    ${t.subjects ? `<div class="popup-field"><span class="lbl">可代科目</span><span class="val">${t.subjects}</span></div>` : ""}
+    ${t.phone ? `<div class="popup-field"><span class="lbl">電話</span><span class="val">${t.phone}</span></div>` : ""}
+    ${t.email ? `<div class="popup-field"><span class="lbl">Email</span><span class="val">${t.email}</span></div>` : ""}
+    ${t.lineId ? `<div class="popup-field"><span class="lbl">Line ID</span><span class="val">${t.lineId}</span></div>` : ""}
+    ${upcoming.length > 0 ? `
+      <div class="popup-section">
+        <div class="popup-section-title">已排定代課日</div>
+        <div class="upcoming-dates">
+          ${upcoming.map(d => `<span class="upcoming-date">${d}</span>`).join("")}
+        </div>
+      </div>` : ""}
+    ${blockedText ? `<div class="restriction-note">⚠ ${blockedText}</div>` : ""}
+    ${disabledText ? `<div class="restriction-note">🔴 ${disabledText}</div>` : ""}
+  `;
+
+  popup.style.display = "block";
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pw = 260;
+  let left = rect.right + 8;
+  if (left + pw > window.innerWidth) left = rect.left - pw - 8;
+  popup.style.left = left + "px";
+  popup.style.top = Math.min(rect.top, window.innerHeight - popup.offsetHeight - 20) + "px";
+}
+
+document.addEventListener("click", (e) => {
+  const popup = document.getElementById("teacher-popup");
+  if (!popup.contains(e.target) && !e.target.closest(".teacher-row")) {
+    popup.style.display = "none";
+  }
+});
+
+// ── Render calendar ────────────────────────────────────────────
+function renderCalendar() {
+  const grid = document.getElementById("cal-grid");
+  const todayStr = toYMD(new Date());
+
+  // check if any Saturday has records
+  const satStr = toYMD(addDays(weekStart, 5));
+  const hasSat = !!(recordsByDate[satStr] && recordsByDate[satStr].length);
+  grid.className = "cal-grid" + (hasSat ? " has-saturday" : "");
+
+  const days = hasSat ? 6 : 5;
+  const weekEnd = addDays(weekStart, days - 1);
+
+  document.getElementById("week-range").textContent =
+    `${weekStart.getMonth()+1}/${weekStart.getDate()} ～ ${weekEnd.getMonth()+1}/${weekEnd.getDate()}`;
+  document.getElementById("topbar-week").textContent =
+    `${weekStart.getFullYear()}年${weekStart.getMonth()+1}月・第${getWeekNumber(weekStart)}週`;
+
+  grid.innerHTML = "";
+  for (let i = 0; i < days; i++) {
+    const d = addDays(weekStart, i);
+    const ds = toYMD(d);
+    const recs = recordsByDate[ds] || [];
+    const isToday = ds === todayStr;
+    const isPast = ds < todayStr;
+
+    const col = document.createElement("div");
+    col.className = "cal-day" +
+      (isToday ? " today" : "") +
+      (isPast ? " past" : "") +
+      (recs.length ? " has-records" : "");
+
+    const SHOW = 3;
+    const shown = recs.slice(0, SHOW);
+    const more = recs.length - SHOW;
+
+    col.innerHTML = `
+      <div class="cal-dow">週${DAYS[d.getDay()]}</div>
+      <div class="cal-date">${d.getDate()}</div>
+      <div class="cal-records">
+        ${shown.map(r => `
+          <div class="cal-record">
+            <span class="arrow">▸</span>
+            <span>${r.absentName || "？"} → ${r.subName || "？"}</span>
+          </div>`).join("")}
+        ${more > 0 ? `<div class="cal-more">還有 ${more} 筆…</div>` : ""}
+      </div>`;
+
+    if (recs.length) col.addEventListener("click", () => showDayModal(ds, recs));
+    grid.appendChild(col);
+  }
+}
+
+function getWeekNumber(d) {
+  const start = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d - start) / 86400000 + start.getDay() + 1) / 7);
+}
+
+// ── Day detail modal ───────────────────────────────────────────
+function showDayModal(dateStr, recs) {
+  const d = parseYMD(dateStr);
+  document.getElementById("day-modal-title").textContent =
+    `${d.getMonth()+1}月${d.getDate()}日（週${DAYS[d.getDay()]}）代課明細`;
+
+  const body = document.getElementById("day-modal-body");
+  body.innerHTML = recs.map(r => `
+    <div class="detail-record">
+      <div class="detail-row">
+        <span class="detail-label">請假老師</span>
+        <span class="detail-val">${r.absentName || "—"}</span>
+        <span class="tag tag-gray" style="margin-left:auto;font-size:10px">${r.leaveType || "—"}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">代課老師</span>
+        <span class="detail-val">${r.subName || "—"}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">班級</span>
+        <span class="detail-val">${r.className || "—"}</span>
+        <span class="detail-label" style="margin-left:12px">科目</span>
+        <span class="detail-val">${r.subject || "—"}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">代課類型</span>
+        <span class="detail-val">${r.subType === "homeroom" ? "代導師班（日薪）" : "代科任（鐘點）"}</span>
+      </div>
+      ${r.subType !== "homeroom" && r.sessions ? `
+      <div>
+        <div class="node-chips">
+          ${r.sessions.map(s => `<span class="node-chip">第${s}節</span>`).join("")}
+        </div>
+      </div>` : ""}
+      ${r.notes ? `<div class="detail-row mt-4"><span class="detail-label">備註</span><span class="detail-val">${r.notes}</span></div>` : ""}
+      <div class="detail-row mt-4">
+        <span class="tag ${r.fundType === "public" ? "tag-blue" : "tag-amber"}">
+          ${r.fundType === "public" ? "公費" : "自費"}
+        </span>
+      </div>
+    </div>`).join("");
+
+  document.getElementById("day-modal").classList.remove("hidden");
+}
+
+document.getElementById("day-modal-close").addEventListener("click", () => {
+  document.getElementById("day-modal").classList.add("hidden");
+});
+document.getElementById("day-modal").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.add("hidden");
+});
+
+// ── Navigation ─────────────────────────────────────────────────
+document.getElementById("btn-prev").addEventListener("click", () => {
+  weekStart = addDays(weekStart, -7);
+  loadAll();
+});
+document.getElementById("btn-next").addEventListener("click", () => {
+  weekStart = addDays(weekStart, 7);
+  loadAll();
+});
+document.getElementById("btn-today").addEventListener("click", () => {
+  weekStart = getMondayOf(new Date());
+  loadAll();
+});
+document.getElementById("toggle-hide-busy").addEventListener("click", (e) => {
+  hideBusy = !hideBusy;
+  e.target.classList.toggle("active", hideBusy);
+  renderTeachers();
+});
+
+// ── Main load ──────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([fetchTeachers(), fetchRecords()]);
+  renderCalendar();
+  renderTeachers();
+
+  // show register btn for admin
+  setTimeout(() => {
+    if (isAdmin()) {
+      document.getElementById("btn-register").style.display = "";
+    }
+  }, 1500);
+}
+
+loadAll();
+</script>
+</body>
+</html>
