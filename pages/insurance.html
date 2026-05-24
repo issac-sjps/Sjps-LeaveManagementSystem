@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>加保管理｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.ins-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.ins-table { width:100%; border-collapse:collapse; font-size:13px; }
+.ins-table th { background:var(--gray-50); color:var(--gray-600); font-size:11px; font-weight:500; padding:8px 12px; text-align:left; border-bottom:1px solid var(--gray-200); white-space:nowrap; }
+.ins-table td { padding:10px 12px; border-bottom:1px solid var(--gray-100); vertical-align:middle; }
+.ins-table tr:hover td { background:var(--gray-50); }
+
+.status-light { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:500; }
+.ins-toggle {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 12px; border-radius:20px; cursor:pointer;
+  font-size:12px; font-weight:500; border:1px solid transparent;
+  transition:all 0.15s; font-family:var(--font);
+}
+.ins-toggle.insured   { background:var(--success-light); color:var(--success); border-color:#aad08a; }
+.ins-toggle.uninsured { background:var(--danger-light);  color:var(--danger);  border-color:#f5b8b8; }
+.ins-toggle.internal  { background:var(--primary-light); color:var(--primary); border-color:#9dc4ef; cursor:default; }
+
+.stat-chips { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.stat-chip { padding:8px 16px; border-radius:var(--radius); border:1px solid var(--gray-200); background:#fff; font-size:13px; }
+.stat-chip .n { font-size:20px; font-weight:700; }
+.stat-chip .l { font-size:11px; color:var(--gray-500); }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div><div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="school">高雄市左營區</div><div class="system">新莊國小代課系統</div></div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">加保管理</div>
+        <div class="topbar-sub" id="topbar-sub">選擇日期查看當日出勤名單</div>
+      </div>
+      <div class="topbar-actions">
+        <input type="date" class="form-control" id="f-date" style="width:160px">
+        <button class="btn btn-secondary btn-sm" id="btn-today">今天</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="stat-chips" id="stat-chips"></div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table class="ins-table">
+            <thead>
+              <tr>
+                <th>代課老師</th>
+                <th>身分</th>
+                <th>代課班級</th>
+                <th>代課類型</th>
+                <th>身分證字號</th>
+                <th>加保狀態</th>
+                <th>加保日期</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="ins-tbody">
+              <tr><td colspan="8" class="text-muted text-sm" style="padding:20px;text-align:center">請選擇日期</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { isClerk, isAdmin } from "../js/auth.js";
+import {
+  collection, getDocs, doc, setDoc, getDoc, query, where
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("insurance");
+
+let allSubTeachers = {};   // id → data
+let insuranceCache = {};   // date → { teacherId → {insured,insuredDate} }
+let currentDate = "";
+
+async function loadTeachers() {
+  const [extSnap, intSnap] = await Promise.all([
+    getDocs(collection(db,"teachers")),
+    getDocs(collection(db,"schoolTeachers")),
+  ]);
+  extSnap.docs.forEach(d => { allSubTeachers[d.id] = {...d.data(), isInternal:false}; });
+  intSnap.docs.forEach(d => { allSubTeachers[d.id] = {...d.data(), isInternal:true}; });
+}
+
+async function loadForDate(dateStr) {
+  currentDate = dateStr;
+  document.getElementById("topbar-sub").textContent = `${dateStr} 出勤名單`;
+
+  // get records for this date
+  const recSnap = await getDocs(query(collection(db,"records"), where("date","==",dateStr)));
+  const records = recSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+  // group by teacher (same teacher same day = one insurance entry)
+  const teacherMap = {};
+  records.forEach(r => {
+    const tid = r.subTeacherId;
+    if (!tid) return;
+    if (!teacherMap[tid]) teacherMap[tid] = { tid, recs:[] };
+    teacherMap[tid].recs.push(r);
+  });
+
+  // load insurance records for this date
+  const insSnap = await getDocs(query(collection(db,"insurance"), where("date","==",dateStr)));
+  const insMap = {};
+  insSnap.docs.forEach(d => { insMap[d.data().teacherId] = {id:d.id,...d.data()}; });
+
+  renderTable(Object.values(teacherMap), insMap);
+}
+
+function renderTable(entries, insMap) {
+  const tbody = document.getElementById("ins-tbody");
+  let cntInsured=0, cntUninsured=0, cntInternal=0;
+
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-muted text-sm" style="padding:20px;text-align:center">該日無代課紀錄</td></tr>`;
+    renderStats(0,0,0); return;
+  }
+
+  tbody.innerHTML = "";
+  entries.forEach(({tid, recs}) => {
+    const t = allSubTeachers[tid] || {};
+    const isInternal = t.isInternal || false;
+    const ins = insMap[tid];
+    const isInsured = ins?.insured || false;
+
+    if (isInternal) cntInternal++;
+    else if (isInsured) cntInsured++;
+    else cntUninsured++;
+
+    // summarise recs
+    const classes = [...new Set(recs.map(r=>r.className).filter(Boolean))].join("、");
+    const typeTag = recs.some(r=>r.subType==="homeroom")
+      ? `<span class="tag tag-amber">導師班</span>`
+      : `<span class="tag tag-blue">科任 ${recs.reduce((s,r)=>s+(r.sessions?.length||0),0)}節</span>`;
+
+    // status button
+    let statusBtn = "";
+    if (isInternal) {
+      statusBtn = `<span class="ins-toggle internal">🔵 校內免保</span>`;
+    } else if (isInsured) {
+      statusBtn = `<button class="ins-toggle insured" data-tid="${tid}" data-action="uninsure">✅ 已加保</button>`;
+    } else {
+      statusBtn = `<button class="ins-toggle uninsured" data-tid="${tid}" data-action="insure">🔴 未加保</button>`;
+    }
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <span class="${t.gender==="female"?"name-female":"name-male"}" style="font-weight:500">${t.name||"—"}</span>
+      </td>
+      <td>${isInternal?`<span class="tag tag-blue">校內</span>`:`<span class="tag tag-gray">校外</span>`}</td>
+      <td>${classes||"—"}</td>
+      <td>${typeTag}</td>
+      <td class="text-sm" style="color:var(--gray-500);font-family:monospace">${isInternal?"—":(t.idNumber||"（未設定）")}</td>
+      <td>${statusBtn}</td>
+      <td class="text-sm" style="color:var(--gray-500)">${ins?.insuredDate||"—"}</td>
+      <td>
+        ${!isInternal?`<button class="btn btn-secondary btn-sm" data-edit="${tid}">設定身分證</button>`:""}
+      </td>`;
+
+    // toggle insurance
+    const toggleBtn = tr.querySelector("[data-action]");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", async () => {
+        const action = toggleBtn.dataset.action;
+        const insId  = `${currentDate}_${tid}`;
+        if (action === "insure") {
+          await setDoc(doc(db,"insurance",insId), {
+            date: currentDate, teacherId: tid,
+            insured: true, insuredDate: new Date().toISOString().slice(0,10),
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          await setDoc(doc(db,"insurance",insId), {
+            date: currentDate, teacherId: tid,
+            insured: false, insuredDate: null,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        await loadForDate(currentDate);
+      });
+    }
+
+    // edit ID number
+    const editBtn = tr.querySelector("[data-edit]");
+    if (editBtn) {
+      editBtn.addEventListener("click", () => {
+        const current = t.idNumber || "";
+        const val = prompt(`請輸入 ${t.name} 的身分證字號：`, current);
+        if (val === null) return;
+        setDoc(doc(db,"teachers",tid), { idNumber: val.trim() }, {merge:true})
+          .then(() => { t.idNumber = val.trim(); loadForDate(currentDate); });
+      });
+    }
+
+    tbody.appendChild(tr);
+  });
+
+  renderStats(cntInsured, cntUninsured, cntInternal);
+}
+
+function renderStats(ins, unins, internal) {
+  document.getElementById("stat-chips").innerHTML = `
+    <div class="stat-chip"><div class="n" style="color:var(--danger)">${unins}</div><div class="l">🔴 未加保</div></div>
+    <div class="stat-chip"><div class="n" style="color:var(--success)">${ins}</div><div class="l">✅ 已加保</div></div>
+    <div class="stat-chip"><div class="n" style="color:var(--primary)">${internal}</div><div class="l">🔵 校內免保</div></div>
+    <div class="stat-chip"><div class="n">${ins+unins+internal}</div><div class="l">今日出勤總計</div></div>`;
+}
+
+document.getElementById("f-date").addEventListener("change", e => loadForDate(e.target.value));
+document.getElementById("btn-today").addEventListener("click", () => {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById("f-date").value = today;
+  loadForDate(today);
+});
+
+// clerk guard: id number edit only for clerk+
+setTimeout(() => {
+  if (!isClerk()) {
+    document.querySelectorAll("[data-edit]").forEach(b=>b.style.display="none");
+  }
+}, 1500);
+
+await loadTeachers();
+const today = new Date().toISOString().slice(0,10);
+document.getElementById("f-date").value = today;
+await loadForDate(today);
+</script>
+</body>
+</html>
