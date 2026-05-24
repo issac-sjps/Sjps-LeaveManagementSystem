@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系統設定｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.settings-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+.setting-section { display:flex; flex-direction:column; gap:12px; }
+.save-btn-row { display:flex; justify-content:flex-end; gap:8px; }
+.saved-msg { font-size:12px; color:var(--success); display:none; }
+.saved-msg.show { display:inline; }
+
+.session-row { display:grid; grid-template-columns:60px 1fr 1fr; gap:8px; align-items:center; margin-bottom:6px; font-size:13px; }
+.session-row .lbl { color:var(--gray-600); font-weight:500; }
+
+.edu-row { border:1px solid var(--gray-200); border-radius:var(--radius-sm); padding:12px; margin-bottom:8px; }
+.edu-row-title { font-size:12px; font-weight:600; color:var(--primary); margin-bottom:8px; }
+.edu-fields { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
+.daily-fields { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:6px; }
+.daily-label  { font-size:10px; color:var(--gray-400); text-align:center; margin-bottom:2px; }
+
+.account-row {
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  border:1px solid var(--gray-200); border-radius:var(--radius-sm);
+  margin-bottom:6px;
+}
+.account-row .email { font-size:13px; flex:1; }
+.account-role { font-size:12px; }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div><div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="school">高雄市左營區</div><div class="system">新莊國小代課系統</div></div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div><div class="topbar-title">系統設定</div><div class="topbar-sub">所有費率與參數變更後請點儲存</div></div>
+    </div>
+
+    <div class="page-body">
+      <div class="settings-grid">
+
+        <!-- Basic -->
+        <div class="card" style="padding:18px">
+          <div class="card-title">🏫 基本資料</div>
+          <div class="setting-section">
+            <div class="form-group">
+              <label class="form-label">學校名稱</label>
+              <input class="form-control" id="s-school-name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">學期起始日</label>
+              <input class="form-control" id="s-sem-start" type="date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">學期結束日</label>
+              <input class="form-control" id="s-sem-end" type="date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">公開頁面密碼</label>
+              <input class="form-control" id="s-password" type="text">
+              <div class="text-xs text-muted mt-4">※ 修改後需重新整理才會生效（前端驗證）</div>
+            </div>
+            <div class="save-btn-row">
+              <span class="saved-msg" id="saved-basic">✓ 已儲存</span>
+              <button class="btn btn-primary btn-sm" id="btn-save-basic">儲存基本資料</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Session fee & homeroom fee -->
+        <div class="card" style="padding:18px">
+          <div class="card-title">💰 代課費率</div>
+          <div class="setting-section">
+            <div class="form-group">
+              <label class="form-label">每節鐘點費（元/節）</label>
+              <input class="form-control" id="s-session-fee" type="number" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">導師費（元/日）</label>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+                <div>
+                  <div class="text-xs text-muted mb-1">28天月</div>
+                  <input class="form-control" id="s-hf-28" type="number" min="0">
+                </div>
+                <div>
+                  <div class="text-xs text-muted mb-1">29天月</div>
+                  <input class="form-control" id="s-hf-29" type="number" min="0">
+                </div>
+                <div>
+                  <div class="text-xs text-muted mb-1">30天月</div>
+                  <input class="form-control" id="s-hf-30" type="number" min="0">
+                </div>
+                <div>
+                  <div class="text-xs text-muted mb-1">31天月</div>
+                  <input class="form-control" id="s-hf-31" type="number" min="0">
+                </div>
+              </div>
+            </div>
+            <div class="save-btn-row">
+              <span class="saved-msg" id="saved-fee">✓ 已儲存</span>
+              <button class="btn btn-primary btn-sm" id="btn-save-fee">儲存費率</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sessions timetable -->
+        <div class="card" style="padding:18px">
+          <div class="card-title">🕐 節次時間</div>
+          <div id="sessions-wrap"></div>
+          <div class="save-btn-row" style="margin-top:8px">
+            <span class="saved-msg" id="saved-sessions">✓ 已儲存</span>
+            <button class="btn btn-primary btn-sm" id="btn-save-sessions">儲存節次</button>
+          </div>
+        </div>
+
+        <!-- Salary table -->
+        <div class="card" style="padding:18px;grid-column:1/-1">
+          <div class="card-title">📋 學歷費率表（代號 1–6）</div>
+          <div id="edu-rows-wrap"></div>
+          <div class="save-btn-row" style="margin-top:8px">
+            <span class="saved-msg" id="saved-edu">✓ 已儲存</span>
+            <button class="btn btn-primary btn-sm" id="btn-save-edu">儲存費率表</button>
+          </div>
+        </div>
+
+        <!-- Accounts -->
+        <div class="card" style="padding:18px;grid-column:1/-1">
+          <div class="card-title">👥 帳號權限管理</div>
+          <div id="accounts-wrap">
+            <div class="text-muted text-sm">載入中…</div>
+          </div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200)">
+            <div class="card-title" style="font-size:12px">新增帳號</div>
+            <div style="display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:end">
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Google Email</label>
+                <input class="form-control" id="new-email" placeholder="name@gmail.com">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">角色</label>
+                <select class="form-control form-select" id="new-role">
+                  <option value="admin">管理者</option>
+                  <option value="clerk">幹事</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" id="btn-add-account">新增</button>
+            </div>
+            <div class="text-xs text-muted mt-4">※ 新帳號需對方先用 Google 登入過一次系統後才能正確對應。</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { isAdmin } from "../js/auth.js";
+import {
+  doc, getDoc, setDoc, getDocs, collection, query, where, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("settings");
+
+let settings = {};
+
+function showSaved(id) {
+  const el = document.getElementById(id);
+  el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"), 2500);
+}
+
+async function load() {
+  const snap = await getDoc(doc(db,"settings","main"));
+  if (!snap.exists()) return;
+  settings = snap.data();
+
+  document.getElementById("s-school-name").value = settings.schoolName || "";
+  document.getElementById("s-sem-start").value   = settings.semesterStart || "";
+  document.getElementById("s-sem-end").value     = settings.semesterEnd   || "";
+  document.getElementById("s-password").value    = settings.password      || "";
+  document.getElementById("s-session-fee").value = settings.sessionFee    || 405;
+
+  const hf = settings.homeroomFee || {};
+  [28,29,30,31].forEach(d => {
+    document.getElementById(`s-hf-${d}`).value = hf[d]||"";
+  });
+
+  // sessions
+  const sessions = settings.sessions || [];
+  const wrap = document.getElementById("sessions-wrap");
+  wrap.innerHTML = "";
+  sessions.forEach((s,i) => {
+    const row = document.createElement("div");
+    row.className = "session-row";
+    row.innerHTML = `
+      <span class="lbl">第 ${s.no} 節</span>
+      <input class="form-control" id="ses-start-${i}" type="time" value="${s.start||""}">
+      <input class="form-control" id="ses-end-${i}"   type="time" value="${s.end  ||""}">`;
+    wrap.appendChild(row);
+  });
+
+  // edu rows
+  const salaryTable = settings.salaryTable || {};
+  const eduWrap = document.getElementById("edu-rows-wrap");
+  eduWrap.innerHTML = "";
+  Object.entries(salaryTable).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([code,s])=>{
+    const div = document.createElement("div");
+    div.className = "edu-row";
+    div.dataset.code = code;
+    div.innerHTML = `
+      <div class="edu-row-title">代號 ${code}</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label">說明</label>
+        <input class="form-control edu-label" data-code="${code}" value="${s.label||""}">
+      </div>
+      <div class="edu-fields">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">薪級</label>
+          <input class="form-control edu-grade" data-code="${code}" type="number" value="${s.grade||""}">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">本薪</label>
+          <input class="form-control edu-base" data-code="${code}" type="number" value="${s.base||""}">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">學術研究加給</label>
+          <input class="form-control edu-research" data-code="${code}" type="number" value="${s.research||""}">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div class="form-label">日薪（各月天數）</div>
+        <div class="daily-fields">
+          ${[28,29,30,31].map(d=>`
+            <div>
+              <div class="daily-label">${d}天月</div>
+              <input class="form-control edu-daily" data-code="${code}" data-days="${d}" type="number" value="${s.daily?.[d]||""}">
+            </div>`).join("")}
+        </div>
+      </div>`;
+    eduWrap.appendChild(div);
+  });
+
+  // accounts
+  await loadAccounts();
+}
+
+async function loadAccounts() {
+  const snap = await getDocs(collection(db,"accounts"));
+  const wrap = document.getElementById("accounts-wrap");
+  wrap.innerHTML = "";
+  snap.docs.forEach(d => {
+    const a = {id:d.id,...d.data()};
+    const row = document.createElement("div");
+    row.className = "account-row";
+    const roleLabel = a.role==="admin"?"管理者":"幹事";
+    const roleClass = a.role==="admin"?"tag-blue":"tag-amber";
+    row.innerHTML = `
+      <span class="email">${a.email||a.id}</span>
+      <span class="tag ${roleClass} account-role">${roleLabel}</span>
+      <select class="form-control form-select" style="width:100px" data-uid="${d.id}">
+        <option value="admin" ${a.role==="admin"?"selected":""}>管理者</option>
+        <option value="clerk" ${a.role==="clerk"?"selected":""}>幹事</option>
+      </select>
+      <button class="btn btn-danger btn-sm" data-del="${d.id}">移除</button>`;
+    row.querySelector("select").addEventListener("change", async e => {
+      await setDoc(doc(db,"accounts",d.id), {role:e.target.value},{merge:true});
+      row.querySelector(".account-role").className = `tag ${e.target.value==="admin"?"tag-blue":"tag-amber"} account-role`;
+      row.querySelector(".account-role").textContent = e.target.value==="admin"?"管理者":"幹事";
+    });
+    row.querySelector("[data-del]").addEventListener("click", async () => {
+      if (!confirm(`確定移除 ${a.email||a.id}？`)) return;
+      await deleteDoc(doc(db,"accounts",d.id));
+      await loadAccounts();
+    });
+    wrap.appendChild(row);
+  });
+}
+
+// save basic
+document.getElementById("btn-save-basic").addEventListener("click", async () => {
+  await setDoc(doc(db,"settings","main"), {
+    schoolName:    document.getElementById("s-school-name").value.trim(),
+    semesterStart: document.getElementById("s-sem-start").value,
+    semesterEnd:   document.getElementById("s-sem-end").value,
+    password:      document.getElementById("s-password").value,
+  },{merge:true});
+  showSaved("saved-basic");
+});
+
+// save fee
+document.getElementById("btn-save-fee").addEventListener("click", async () => {
+  await setDoc(doc(db,"settings","main"), {
+    sessionFee: Number(document.getElementById("s-session-fee").value),
+    homeroomFee: {
+      28: Number(document.getElementById("s-hf-28").value),
+      29: Number(document.getElementById("s-hf-29").value),
+      30: Number(document.getElementById("s-hf-30").value),
+      31: Number(document.getElementById("s-hf-31").value),
+    },
+  },{merge:true});
+  showSaved("saved-fee");
+});
+
+// save sessions
+document.getElementById("btn-save-sessions").addEventListener("click", async () => {
+  const sessions = (settings.sessions||[]).map((s,i) => ({
+    no:    s.no,
+    start: document.getElementById(`ses-start-${i}`)?.value || s.start,
+    end:   document.getElementById(`ses-end-${i}`)?.value   || s.end,
+  }));
+  await setDoc(doc(db,"settings","main"), {sessions},{merge:true});
+  showSaved("saved-sessions");
+});
+
+// save edu
+document.getElementById("btn-save-edu").addEventListener("click", async () => {
+  const salaryTable = {};
+  document.querySelectorAll(".edu-row").forEach(row => {
+    const code = row.dataset.code;
+    const daily = {};
+    row.querySelectorAll(".edu-daily").forEach(inp => { daily[Number(inp.dataset.days)] = Number(inp.value); });
+    salaryTable[code] = {
+      label:    row.querySelector(".edu-label").value,
+      grade:    Number(row.querySelector(".edu-grade").value),
+      base:     Number(row.querySelector(".edu-base").value),
+      research: Number(row.querySelector(".edu-research").value),
+      daily,
+    };
+  });
+  await setDoc(doc(db,"settings","main"), {salaryTable},{merge:true});
+  showSaved("saved-edu");
+});
+
+// add account
+document.getElementById("btn-add-account").addEventListener("click", async () => {
+  const email = document.getElementById("new-email").value.trim();
+  const role  = document.getElementById("new-role").value;
+  if (!email) { alert("請輸入 Email"); return; }
+  // find user by email in accounts
+  const snap = await getDocs(query(collection(db,"accounts"), where("email","==",email)));
+  if (snap.empty) {
+    // create placeholder – will be matched when user logs in
+    await setDoc(doc(db,"accounts","pending_"+Date.now()), { email, role, pending:true, createdAt:new Date().toISOString() });
+  } else {
+    await setDoc(doc(db,"accounts",snap.docs[0].id), {role},{merge:true});
+  }
+  document.getElementById("new-email").value="";
+  await loadAccounts();
+});
+
+// admin guard
+setTimeout(()=>{
+  if (!isAdmin()) {
+    document.querySelectorAll("button:not(#pw-btn):not(#btn-logout):not(#btn-login)").forEach(b=>b.disabled=true);
+    document.querySelectorAll("input,select,textarea").forEach(el=>{if(el.id!=="pw-input")el.disabled=true;});
+  }
+},1500);
+
+await load();
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代課老師徵詢｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.teacher-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+.tc-card {
+  background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius);
+  padding:18px; display:flex; flex-direction:column; gap:12px;
+  transition:box-shadow 0.15s;
+}
+.tc-card:hover { box-shadow:0 4px 14px rgba(0,0,0,0.08); }
+.tc-card.unavailable { opacity:0.55; }
+
+.tc-head { display:flex; align-items:center; gap:12px; }
+.tc-avatar {
+  width:46px; height:46px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:700; flex-shrink:0;
+}
+.tc-avatar.male   { background:var(--primary-light); color:var(--primary); }
+.tc-avatar.female { background:#FBEAF0; color:var(--female); }
+
+.tc-name  { font-size:16px; font-weight:700; }
+.tc-edu   { font-size:11px; color:var(--gray-500); margin-top:2px; }
+.tc-wage  { font-size:12px; color:var(--primary); font-weight:500; }
+
+.contact-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.contact-row .icon { width:18px; text-align:center; flex-shrink:0; }
+.contact-row .val  { color:var(--gray-800); word-break:break-all; }
+
+.subject-chips { display:flex; flex-wrap:wrap; gap:4px; }
+.avail-section { background:var(--gray-50); border-radius:var(--radius-sm); padding:10px 12px; }
+.avail-title   { font-size:10px; color:var(--gray-400); letter-spacing:0.5px; margin-bottom:6px; }
+.booked-dates  { display:flex; flex-wrap:wrap; gap:4px; }
+.booked-date   { font-size:10px; padding:2px 7px; border-radius:4px; background:var(--danger-light); color:var(--danger); }
+.blocked-note  { font-size:11px; color:var(--warning); background:var(--warning-light); padding:4px 8px; border-radius:4px; }
+.search-bar    { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+.search-box    { position:relative; flex:1; min-width:180px; max-width:300px; }
+.search-box input { padding-left:30px; }
+.search-icon   { position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--gray-400); pointer-events:none; }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div><div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="school">高雄市左營區</div><div class="system">新莊國小代課系統</div></div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">代課老師徵詢</div>
+        <div class="topbar-sub" id="teacher-count">載入中…</div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="card" style="padding:12px 16px;margin-bottom:14px;background:var(--primary-light);border-color:var(--primary)">
+        <div style="font-size:13px;color:var(--primary)">
+          💡 此頁面供校內老師自行媒合代課教師。請直接聯絡意願老師確認後，再請教學組正式登記。
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input class="form-control" id="search-input" placeholder="搜尋姓名或科目…">
+        </div>
+        <select class="form-control form-select" id="filter-gender" style="width:100px">
+          <option value="">全部性別</option>
+          <option value="male">男</option>
+          <option value="female">女</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="filter-avail"> 只顯示今日可代課
+        </label>
+      </div>
+
+      <div class="teacher-grid" id="teacher-grid">
+        <div class="text-muted text-sm">載入中…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import {
+  collection, getDocs, doc, getDoc, query, where, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("teachers");
+
+const DOW_ZH = ["日","一","二","三","四","五","六"];
+let allTeachers = [];
+let salaryTable = {};
+let upcomingMap = {}; // teacherId → [dates]
+let todayBusy   = new Set();
+
+async function loadAll() {
+  const today = new Date().toISOString().slice(0,10);
+  const todayDow = new Date().getDay();
+
+  const [settSnap, tSnap, recSnap, futureSnap] = await Promise.all([
+    getDoc(doc(db,"settings","main")),
+    getDocs(collection(db,"teachers")),
+    getDocs(query(collection(db,"records"), where("date","==",today))),
+    getDocs(query(collection(db,"records"), where("date",">=",today), orderBy("date"))),
+  ]);
+
+  if (settSnap.exists()) salaryTable = settSnap.data().salaryTable || {};
+
+  allTeachers = tSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+  // today busy
+  recSnap.docs.forEach(d => todayBusy.add(d.data().subTeacherId));
+
+  // upcoming per teacher
+  futureSnap.docs.forEach(d => {
+    const r = d.data();
+    if (!r.subTeacherId) return;
+    if (!upcomingMap[r.subTeacherId]) upcomingMap[r.subTeacherId] = [];
+    if (!upcomingMap[r.subTeacherId].includes(r.date))
+      upcomingMap[r.subTeacherId].push(r.date);
+  });
+
+  document.getElementById("teacher-count").textContent = `共 ${allTeachers.length} 位代課老師`;
+  renderCards();
+}
+
+function renderCards() {
+  const search  = document.getElementById("search-input").value.trim().toLowerCase();
+  const gender  = document.getElementById("filter-gender").value;
+  const onlyAvail = document.getElementById("filter-avail").checked;
+  const today   = new Date().toISOString().slice(0,10);
+  const todayDow = new Date().getDay();
+
+  const filtered = allTeachers.filter(t => {
+    if (search && !t.name?.toLowerCase().includes(search) && !t.subjects?.toLowerCase().includes(search)) return false;
+    if (gender && t.gender !== gender) return false;
+    const disabled = t.disabledFrom && t.disabledTo && today>=t.disabledFrom && today<=t.disabledTo;
+    const blocked  = t.blockedDays?.includes(todayDow);
+    if (onlyAvail && (disabled || blocked || todayBusy.has(t.id))) return false;
+    return true;
+  });
+
+  const grid = document.getElementById("teacher-grid");
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="text-muted text-sm" style="padding:16px">沒有符合條件的老師</div>`;
+    return;
+  }
+  grid.innerHTML = "";
+
+  filtered.forEach(t => {
+    const today2  = new Date().toISOString().slice(0,10);
+    const todayDow2 = new Date().getDay();
+    const disabled  = t.disabledFrom && t.disabledTo && today2>=t.disabledFrom && today2<=t.disabledTo;
+    const blocked   = t.blockedDays?.includes(todayDow2);
+    const isBusy    = todayBusy.has(t.id);
+    const unavail   = disabled || blocked;
+
+    const edu = salaryTable[t.eduCode];
+    const wage30 = edu?.daily?.[30] ? Number(edu.daily[30]).toLocaleString()+"元/日" : "";
+    const eduLabel = edu ? `${t.eduCode}. ${edu.label}` : (t.eduLabel||"");
+
+    const upcoming = upcomingMap[t.id] || [];
+    const blockedText = t.blockedDays?.length
+      ? "每週"+t.blockedDays.map(d=>DOW_ZH[d]).join("、")+"不可代課" : "";
+
+    const card = document.createElement("div");
+    card.className = "tc-card" + (unavail ? " unavailable" : "");
+
+    card.innerHTML = `
+      <div class="tc-head">
+        <div class="tc-avatar ${t.gender==="female"?"female":"male"}">${(t.name||"?").slice(0,2)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="tc-name ${t.gender==="female"?"name-female":"name-male"}">${t.name||"—"}</div>
+          <div class="tc-edu">${eduLabel}</div>
+          ${wage30?`<div class="tc-wage">日薪 ${wage30}（30天月）</div>`:""}
+        </div>
+        <div>
+          ${isBusy?`<span class="tag tag-green">今日代課中</span>`:
+            unavail?`<span class="tag tag-red">今日不可</span>`:
+            `<span class="tag tag-gray">可聯絡</span>`}
+        </div>
+      </div>
+
+      ${t.subjects?`<div class="subject-chips">
+        ${t.subjects.split(/[、,，]/).map(s=>`<span class="tag tag-blue">${s.trim()}</span>`).join("")}
+      </div>`:""}
+
+      <div style="display:flex;flex-direction:column;gap:5px">
+        ${t.phone  ?`<div class="contact-row"><span class="icon">📞</span><span class="val">${t.phone}</span></div>`:""}
+        ${t.email  ?`<div class="contact-row"><span class="icon">✉️</span><span class="val">${t.email}</span></div>`:""}
+        ${t.lineId ?`<div class="contact-row"><span class="icon">💬</span><span class="val">Line: ${t.lineId}</span></div>`:""}
+      </div>
+
+      <div class="avail-section">
+        <div class="avail-title">近期已排定代課日</div>
+        ${upcoming.length
+          ? `<div class="booked-dates">${upcoming.slice(0,8).map(d=>`<span class="booked-date">${d}</span>`).join("")}${upcoming.length>8?`<span class="text-xs text-muted">…共${upcoming.length}日</span>`:""}</div>`
+          : `<div class="text-xs text-muted">目前無排定</div>`}
+      </div>
+
+      ${blockedText?`<div class="blocked-note">⚠ ${blockedText}</div>`:""}
+      ${disabled?`<div class="blocked-note">🔴 停用中：${t.disabledFrom} ～ ${t.disabledTo}</div>`:""}
+      ${t.notes?`<div class="text-xs text-muted">${t.notes}</div>`:""}`;
+
+    grid.appendChild(card);
+  });
+}
+
+["search-input","filter-gender"].forEach(id =>
+  document.getElementById(id).addEventListener("input", renderCards));
+document.getElementById("filter-avail").addEventListener("change", renderCards);
+
+await loadAll();
+</script>
+</body>
+</html>

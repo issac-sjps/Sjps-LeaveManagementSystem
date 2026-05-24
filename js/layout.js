@@ -1,4 +1,4 @@
-import { initAuth, logout, isAdmin, isClerk } from "./auth.js";
+import { initAuth, logout, isAdmin, isClerk, loginWithGoogle } from "./auth.js";
 
 const SITE_PASSWORD = "073411373";
 const PW_KEY = "sjps_authed";
@@ -25,15 +25,16 @@ function inPages() {
   return window.location.pathname.includes("/pages/");
 }
 
-// Convert a "root-relative" path like "pages/foo.html" or "index.html"
-// to the correct href depending on whether we're in /pages/ or at root.
+// Convert a root-relative path to correct href
+// from root:  "pages/foo.html" → "pages/foo.html"
+// from pages: "pages/foo.html" → "foo.html"
+// from root:  "index.html"     → "index.html"
+// from pages: "index.html"     → "../index.html"
 function href(rootRelative) {
   if (rootRelative === "index.html") {
     return inPages() ? "../index.html" : "index.html";
   }
-  // rootRelative is like "pages/sub-teachers.html"
   if (inPages()) {
-    // strip the "pages/" prefix → just "sub-teachers.html"
     return rootRelative.replace(/^pages\//, "");
   }
   return rootRelative;
@@ -43,22 +44,19 @@ export function initLayout(activePage) {
   initPasswordGate();
 
   const navItems = [
-    // public
-    { id: "home",             label: "首頁",         icon: "🏠", path: "index.html",                     public: true },
-    { id: "query",            label: "查詢",         icon: "🔍", path: "pages/query.html",               public: true },
-    { id: "teachers",         label: "代課老師徵詢", icon: "👩‍🏫", path: "pages/teachers.html",            public: true },
-    { id: "salary-table",     label: "薪資費率表",   icon: "💰", path: "pages/salary-table.html",        public: true },
-    // admin / clerk section
+    { id: "home",            label: "首頁",         icon: "🏠", path: "index.html",               public: true  },
+    { id: "query",           label: "查詢",         icon: "🔍", path: "pages/query.html",         public: true  },
+    { id: "teachers",        label: "代課老師徵詢", icon: "👩‍🏫", path: "pages/teachers.html",      public: true  },
+    { id: "salary-table",    label: "薪資費率表",   icon: "💰", path: "pages/salary-table.html",  public: true  },
     { divider: "管理功能" },
-    { id: "register",         label: "代課登記",     icon: "📝", path: "pages/register.html",            admin: true },
-    { id: "salary-calc",      label: "薪資計算",     icon: "🧮", path: "pages/salary-calc.html",         clerk: true },
-    { id: "insurance",        label: "加保管理",     icon: "🛡️",  path: "pages/insurance.html",           clerk: true },
-    // data section
+    { id: "register",        label: "代課登記",     icon: "📝", path: "pages/register.html",      admin: true   },
+    { id: "salary-calc",     label: "薪資計算",     icon: "🧮", path: "pages/salary-calc.html",   clerk: true   },
+    { id: "insurance",       label: "加保管理",     icon: "🛡️",  path: "pages/insurance.html",    clerk: true   },
     { divider: "資料管理" },
-    { id: "sub-teachers",     label: "代課老師管理", icon: "👤", path: "pages/sub-teachers.html",        admin: true },
-    { id: "school-teachers",  label: "校內老師管理", icon: "🏫", path: "pages/school-teachers.html",     admin: true },
-    { id: "overtime",         label: "超鐘點設定",   icon: "⏰", path: "pages/overtime.html",            admin: true },
-    { id: "settings",         label: "系統設定",     icon: "⚙️",  path: "pages/settings.html",            admin: true },
+    { id: "sub-teachers",    label: "代課老師管理", icon: "👤", path: "pages/sub-teachers.html",  admin: true   },
+    { id: "school-teachers", label: "校內老師管理", icon: "🏫", path: "pages/school-teachers.html", admin: true },
+    { id: "overtime",        label: "超鐘點設定",   icon: "⏰", path: "pages/overtime.html",      admin: true   },
+    { id: "settings",        label: "系統設定",     icon: "⚙️",  path: "pages/settings.html",     admin: true   },
   ];
 
   initAuth((user, role) => {
@@ -67,7 +65,6 @@ export function initLayout(activePage) {
     nav.innerHTML = "";
 
     navItems.forEach(item => {
-      // divider
       if (item.divider) {
         if (!user) return;
         const el = document.createElement("div");
@@ -76,9 +73,8 @@ export function initLayout(activePage) {
         nav.appendChild(el);
         return;
       }
-      // permission check
-      if (item.admin  && !isAdmin())  return;
-      if (item.clerk  && !isClerk())  return;
+      if (item.admin && !isAdmin()) return;
+      if (item.clerk && !isClerk()) return;
 
       const a = document.createElement("a");
       a.className = "nav-item" + (item.id === activePage ? " active" : "");
@@ -87,9 +83,9 @@ export function initLayout(activePage) {
       nav.appendChild(a);
     });
 
-    // Footer: login / user chip
     const footer = document.getElementById("sidebar-footer");
     if (!footer) return;
+
     if (user) {
       const initials  = user.displayName ? user.displayName.slice(0, 2) : "？";
       const roleLabel = role === "admin" ? "管理者" : role === "clerk" ? "幹事" : "訪客";
@@ -105,10 +101,8 @@ export function initLayout(activePage) {
       document.getElementById("btn-logout").addEventListener("click", logout);
     } else {
       footer.innerHTML = `<button class="btn btn-secondary w-full" id="btn-login">🔑 Google 登入</button>`;
-      document.getElementById("btn-login").addEventListener("click", async () => {
-        const { loginWithGoogle } = await import("./auth.js");
-        await loginWithGoogle();
-      });
+      // ── 關鍵修正：直接用已 import 的 loginWithGoogle，不用動態 import ──
+      document.getElementById("btn-login").addEventListener("click", loginWithGoogle);
     }
   });
 }

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>薪資費率表｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.rate-table { width:100%; border-collapse:collapse; font-size:13px; text-align:center; }
+.rate-table th { background:var(--primary); color:#fff; padding:10px 8px; font-size:12px; font-weight:500; border:1px solid #0e4a8a; }
+.rate-table th.sub { background:#2470bc; font-size:11px; }
+.rate-table td { padding:9px 8px; border:1px solid var(--gray-200); }
+.rate-table tr:nth-child(even) td { background:var(--gray-50); }
+.rate-table .highlight { font-weight:700; color:var(--primary); }
+.rate-table .section-header td { background:var(--primary-light); font-weight:600; color:var(--primary); }
+
+.code-badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:24px; height:24px; border-radius:50%;
+  background:var(--primary); color:#fff; font-size:11px; font-weight:700;
+}
+.session-box {
+  background:var(--success-light); border:1px solid #aad08a;
+  border-radius:var(--radius); padding:16px 24px; text-align:center;
+}
+.session-box .fee { font-size:32px; font-weight:700; color:var(--success); }
+.session-box .label { font-size:13px; color:var(--gray-600); margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div><div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="school">高雄市左營區</div><div class="system">新莊國小代課系統</div></div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">薪資費率表</div>
+        <div class="topbar-sub">教師請假所聘代課教師費用明細表</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-print">🖨 列印</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Session fee -->
+      <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+        <div class="session-box">
+          <div class="fee" id="session-fee-display">405 元</div>
+          <div class="label">每節鐘點代課費</div>
+        </div>
+        <div class="card" style="padding:16px;flex:1;min-width:200px">
+          <div class="card-title">導師費（每日）</div>
+          <div id="homeroom-fee-table" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px"></div>
+        </div>
+      </div>
+
+      <!-- Main rate table -->
+      <div class="card" style="padding:0;overflow:hidden;overflow-x:auto">
+        <table class="rate-table" id="rate-table">
+          <thead>
+            <tr>
+              <th rowspan="2">學歷代號</th>
+              <th rowspan="2" style="min-width:180px">代號說明</th>
+              <th rowspan="2">薪級</th>
+              <th rowspan="2">本薪</th>
+              <th rowspan="2">學術研究加給<br>（8折）</th>
+              <th rowspan="2">合計</th>
+              <th colspan="4">日薪</th>
+            </tr>
+            <tr>
+              <th class="sub">當月28日</th>
+              <th class="sub">當月29日</th>
+              <th class="sub">當月30日</th>
+              <th class="sub">當月31日</th>
+            </tr>
+          </thead>
+          <tbody id="rate-tbody">
+            <tr><td colspan="10" class="text-muted" style="padding:20px">載入中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="padding:14px;margin-top:16px;background:var(--warning-light);border-color:var(--warning)">
+        <div style="font-size:12px;color:var(--warning);line-height:1.8">
+          ⚠ 本費率表自114年1月1日生效，鐘點費自114年9月1日生效。<br>
+          ⚠ 導師費由學校全額公費支出；日薪依請假假別分公費或自費。<br>
+          ⚠ 如費率有調整，請至「系統設定」更新數字。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("salary-table");
+
+async function loadAndRender() {
+  const snap = await getDoc(doc(db,"settings","main"));
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const salaryTable = data.salaryTable || {};
+  const homeroomFee = data.homeroomFee || {};
+  const sessionFee  = data.sessionFee  || 405;
+
+  // session fee
+  document.getElementById("session-fee-display").textContent = sessionFee.toLocaleString() + " 元";
+
+  // homeroom fee
+  const hfDiv = document.getElementById("homeroom-fee-table");
+  hfDiv.innerHTML = [28,29,30,31].map(d => `
+    <div style="text-align:center">
+      <div style="font-size:11px;color:var(--gray-500)">${d}天月</div>
+      <div style="font-size:18px;font-weight:700;color:var(--success)">${(homeroomFee[d]||0).toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--gray-400)">元/日</div>
+    </div>`).join("");
+
+  // main table
+  const tbody = document.getElementById("rate-tbody");
+  tbody.innerHTML = "";
+  Object.entries(salaryTable).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([code,s])=>{
+    const total = (s.base||0)+(s.research||0);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><span class="code-badge">${code}</span></td>
+      <td style="text-align:left;font-size:12px">${s.label||"—"}</td>
+      <td>${s.grade||"—"}</td>
+      <td>${(s.base||0).toLocaleString()}</td>
+      <td>${(s.research||0).toLocaleString()}</td>
+      <td class="highlight">${total.toLocaleString()}</td>
+      <td class="highlight">${(s.daily?.[28]||0).toLocaleString()}</td>
+      <td class="highlight">${(s.daily?.[29]||0).toLocaleString()}</td>
+      <td class="highlight">${(s.daily?.[30]||0).toLocaleString()}</td>
+      <td class="highlight">${(s.daily?.[31]||0).toLocaleString()}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById("btn-print").addEventListener("click", ()=>window.print());
+await loadAndRender();
+</script>
+</body>
+</html>

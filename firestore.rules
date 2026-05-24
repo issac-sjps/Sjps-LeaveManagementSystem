@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────
+
+    // Check if the user is logged in
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    // Check role from accounts collection
+    function getRole() {
+      return get(/databases/$(database)/documents/accounts/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isLoggedIn() && getRole() == 'admin';
+    }
+
+    function isClerk() {
+      return isLoggedIn() && (getRole() == 'admin' || getRole() == 'clerk');
+    }
+
+    // ── settings ──────────────────────────────────────────────
+    // Anyone authenticated can read; only admin can write
+    match /settings/{docId} {
+      allow read:  if true;         // public (password gated in frontend only)
+      allow write: if isAdmin();
+    }
+
+    // ── teachers (代課老師) ────────────────────────────────────
+    // Public read (password gated in frontend); admin write
+    match /teachers/{docId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    // ── schoolTeachers (校內老師) ─────────────────────────────
+    match /schoolTeachers/{docId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    // ── records (代課紀錄) ────────────────────────────────────
+    // Public read; admin write
+    match /records/{docId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    // ── insurance (加保) ──────────────────────────────────────
+    // Clerk (幹事) and admin can read/write
+    // Public cannot read (contains sensitive info)
+    match /insurance/{docId} {
+      allow read:  if isClerk();
+      allow write: if isClerk();
+    }
+
+    // ── overtime (超鐘點設定) ─────────────────────────────────
+    match /overtime/{docId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    // ── accounts (帳號權限) ───────────────────────────────────
+    // Users can read their own account doc (for role check)
+    // Only admin can write / manage accounts
+    match /accounts/{uid} {
+      allow read:  if isLoggedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}

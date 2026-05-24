@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>薪資計算｜新莊國小</title>
+<link rel="stylesheet" href="../css/main.css">
+<style>
+.salary-layout { display:grid; grid-template-columns:260px 1fr; gap:16px; align-items:start; }
+.filter-panel { position:sticky; top:calc(var(--topbar-h)+20px); }
+
+.teacher-sel-list { display:flex; flex-direction:column; gap:3px; max-height:300px; overflow-y:auto; margin-top:8px; }
+.teacher-sel-item {
+  display:flex; align-items:center; gap:8px; padding:7px 10px;
+  border-radius:var(--radius-sm); cursor:pointer; border:1px solid transparent;
+  transition:all 0.12s; font-size:13px;
+}
+.teacher-sel-item:hover { background:var(--gray-50); border-color:var(--gray-200); }
+.teacher-sel-item.selected { background:var(--primary-light); border-color:var(--primary); }
+
+.salary-table { width:100%; border-collapse:collapse; font-size:13px; }
+.salary-table th { background:var(--gray-50); color:var(--gray-600); font-size:11px; font-weight:500; padding:8px 12px; text-align:left; border-bottom:1px solid var(--gray-200); white-space:nowrap; }
+.salary-table td { padding:10px 12px; border-bottom:1px solid var(--gray-100); vertical-align:middle; }
+.salary-table tr:hover td { background:var(--gray-50); }
+.salary-table tfoot td { background:var(--gray-50); font-weight:600; padding:12px; }
+
+.summary-bar {
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  background:var(--primary-light); border:1px solid var(--primary);
+  border-radius:var(--radius); padding:14px 18px; margin-bottom:14px;
+}
+.summary-bar .total { font-size:22px; font-weight:700; color:var(--primary); }
+.summary-bar .label { font-size:12px; color:var(--gray-600); }
+.summary-bar .sub { font-size:12px; color:var(--gray-500); }
+
+.export-bar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+
+/* print / export styles */
+@media print {
+  .sidebar, .topbar, .filter-panel, .export-bar, .btn { display:none !important; }
+  .salary-layout { grid-template-columns:1fr; }
+  .main-content { margin-left:0; }
+}
+</style>
+</head>
+<body>
+
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">新莊國小</div><div class="pw-school">代理代課管理系統</div>
+  <div style="font-size:12px;color:var(--gray-500);">請輸入校內密碼以繼續</div>
+  <div class="pw-box">
+    <input type="password" class="pw-input" id="pw-input" placeholder="••••••••" autocomplete="off">
+    <button class="btn btn-primary" id="pw-btn">進入</button>
+  </div>
+  <div class="pw-error" id="pw-error"></div>
+</div>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="school">高雄市左營區</div><div class="system">新莊國小代課系統</div></div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">薪資計算</div>
+        <div class="topbar-sub" id="topbar-sub">選擇期間與老師</div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="salary-layout">
+
+        <!-- Left filter -->
+        <div class="filter-panel card" style="padding:16px">
+          <div class="card-title">📅 查詢期間</div>
+
+          <!-- Year/Month quick select -->
+          <div class="form-group">
+            <label class="form-label">年度</label>
+            <select class="form-control form-select" id="f-year"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">月份</label>
+            <select class="form-control form-select" id="f-month">
+              <option value="1">1月</option><option value="2">2月</option>
+              <option value="3">3月</option><option value="4">4月</option>
+              <option value="5">5月</option><option value="6">6月</option>
+              <option value="7">7月</option><option value="8">8月</option>
+              <option value="9">9月</option><option value="10">10月</option>
+              <option value="11">11月</option><option value="12">12月</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+            <div style="flex:1;height:1px;background:var(--gray-200)"></div>
+            <span class="text-xs text-muted">或自訂範圍</span>
+            <div style="flex:1;height:1px;background:var(--gray-200)"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">起始日</label>
+            <input class="form-control" id="f-from" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">結束日</label>
+            <input class="form-control" id="f-to" type="date">
+          </div>
+
+          <button class="btn btn-primary w-full" id="btn-load">載入紀錄</button>
+
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-200)">
+            <div class="card-title">👤 選擇老師</div>
+            <div class="text-xs text-muted">點選老師查看個人薪資單</div>
+            <div class="teacher-sel-list" id="teacher-sel-list">
+              <div class="text-muted text-sm">先載入紀錄</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right result -->
+        <div>
+          <!-- Summary bar (all teachers) -->
+          <div class="summary-bar" id="summary-bar" style="display:none">
+            <div>
+              <div class="label">期間總薪資</div>
+              <div class="total" id="sum-total">0 元</div>
+            </div>
+            <div>
+              <div class="label">代課筆數</div>
+              <div class="total" id="sum-count" style="font-size:18px">0</div>
+            </div>
+            <div>
+              <div class="label">涉及老師</div>
+              <div class="total" id="sum-teachers" style="font-size:18px">0</div>
+            </div>
+            <div class="sub" id="sum-period"></div>
+          </div>
+
+          <!-- Export bar -->
+          <div class="export-bar" id="export-bar" style="display:none">
+            <button class="btn btn-secondary" id="btn-print">🖨 列印</button>
+            <button class="btn btn-secondary" id="btn-excel">📊 匯出 Excel</button>
+            <span class="text-sm text-muted" id="export-hint"></span>
+          </div>
+
+          <!-- Table -->
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table class="salary-table" id="salary-table">
+                <thead id="salary-thead"></thead>
+                <tbody id="salary-tbody">
+                  <tr><td colspan="8" class="text-muted text-sm" style="padding:24px;text-align:center">請選擇期間後點擊「載入紀錄」</td></tr>
+                </tbody>
+                <tfoot id="salary-tfoot"></tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- Salary slip (single teacher) -->
+          <div id="salary-slip" style="display:none;margin-top:16px">
+            <div class="card" style="padding:24px;max-width:600px" id="slip-content">
+              <!-- generated by JS -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initLayout } from "../js/layout.js";
+import { db } from "../js/firebase-config.js";
+import { isClerk } from "../js/auth.js";
+import {
+  collection, getDocs, doc, getDoc, query, where, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+initLayout("salary-calc");
+
+// ── State ─────────────────────────────────────────────────────
+let settings    = {};
+let salaryTable = {};
+let homeroomFee = {};
+let sessionFee  = 405;
+let allRecords  = [];
+let allTeachers = {}; // id→data
+let selectedTeacherId = null;
+
+const FUND_LABELS = {
+  "public":"公費","comp-public":"補休（公費）","comp-self":"補休（自付）",
+  "self":"事病假（自付）","pub-self":"公假（自付）","pub-pta":"公假（家長會）",
+};
+
+// ── Init year/month dropdowns ──────────────────────────────────
+const now = new Date();
+const yearSel = document.getElementById("f-year");
+for (let y = now.getFullYear(); y >= now.getFullYear()-3; y--) {
+  const o = document.createElement("option");
+  o.value = y; o.textContent = y+"年";
+  if (y === now.getFullYear()) o.selected = true;
+  yearSel.appendChild(o);
+}
+document.getElementById("f-month").value = now.getMonth()+1;
+
+// sync month/year → date range
+function syncDateRange() {
+  const y = Number(document.getElementById("f-year").value);
+  const m = Number(document.getElementById("f-month").value);
+  const last = new Date(y, m, 0).getDate();
+  document.getElementById("f-from").value = `${y}-${String(m).padStart(2,"0")}-01`;
+  document.getElementById("f-to").value   = `${y}-${String(m).padStart(2,"0")}-${last}`;
+}
+document.getElementById("f-year").addEventListener("change", syncDateRange);
+document.getElementById("f-month").addEventListener("change", syncDateRange);
+syncDateRange();
+
+// ── Load settings ─────────────────────────────────────────────
+async function loadSettings() {
+  const snap = await getDoc(doc(db,"settings","main"));
+  if (snap.exists()) {
+    settings    = snap.data();
+    salaryTable = settings.salaryTable || {};
+    homeroomFee = settings.homeroomFee || {};
+    sessionFee  = settings.sessionFee  || 405;
+  }
+}
+
+async function loadTeachers() {
+  const [extSnap, intSnap] = await Promise.all([
+    getDocs(collection(db,"teachers")),
+    getDocs(collection(db,"schoolTeachers")),
+  ]);
+  extSnap.docs.forEach(d => { allTeachers[d.id] = {...d.data(), isInternal:false}; });
+  intSnap.docs.forEach(d => { allTeachers[d.id] = {...d.data(), isInternal:true}; });
+}
+
+// ── Compute wage for a record ─────────────────────────────────
+function computeWage(r) {
+  const t = allTeachers[r.subTeacherId];
+  if (!t) return r.wage || 0;
+  const edu = salaryTable[t.eduCode];
+  if (!edu) return r.wage || 0;
+  const dateStr = r.date || "";
+  const [y, m] = dateStr.split("-").map(Number);
+  const daysInMonth = y && m ? new Date(y, m, 0).getDate() : 30;
+
+  if (r.subType === "homeroom") {
+    return (edu.daily?.[daysInMonth] || 0) + (homeroomFee[daysInMonth] || 0);
+  } else {
+    return (r.sessions?.length || 0) * sessionFee;
+  }
+}
+
+// ── Load records ──────────────────────────────────────────────
+async function loadRecords() {
+  const from = document.getElementById("f-from").value;
+  const to   = document.getElementById("f-to").value;
+  if (!from || !to) { alert("請選擇起迄日期"); return; }
+
+  const q = query(collection(db,"records"), where("date",">=",from), where("date","<=",to), orderBy("date"));
+  const snap = await getDocs(q);
+  allRecords = snap.docs.map(d => {
+    const r = {id:d.id,...d.data()};
+    r.wage = computeWage(r);
+    return r;
+  });
+
+  document.getElementById("topbar-sub").textContent = `${from} ～ ${to}，共 ${allRecords.length} 筆`;
+  selectedTeacherId = null;
+  renderSummary();
+  renderTeacherList();
+  renderAllTable();
+  document.getElementById("salary-slip").style.display = "none";
+}
+
+// ── Render summary bar ────────────────────────────────────────
+function renderSummary() {
+  const from = document.getElementById("f-from").value;
+  const to   = document.getElementById("f-to").value;
+  const total = allRecords.reduce((s,r)=>s+(r.wage||0), 0);
+  const teachers = new Set(allRecords.map(r=>r.subTeacherId).filter(Boolean)).size;
+  document.getElementById("sum-total").textContent   = total.toLocaleString() + " 元";
+  document.getElementById("sum-count").textContent   = allRecords.length;
+  document.getElementById("sum-teachers").textContent= teachers;
+  document.getElementById("sum-period").textContent  = `${from} ～ ${to}`;
+  document.getElementById("summary-bar").style.display = "";
+  document.getElementById("export-bar").style.display  = "";
+  document.getElementById("export-hint").textContent   = "（月結總表）";
+}
+
+// ── Render teacher selector ────────────────────────────────────
+function renderTeacherList() {
+  const tids = [...new Set(allRecords.map(r=>r.subTeacherId).filter(Boolean))];
+  const list = document.getElementById("teacher-sel-list");
+  list.innerHTML = "";
+  if (!tids.length) {
+    list.innerHTML = `<div class="text-muted text-sm">此期間無代課紀錄</div>`;
+    return;
+  }
+  // "all" option
+  const allItem = document.createElement("div");
+  allItem.className = "teacher-sel-item selected";
+  allItem.innerHTML = `<span class="light light-blue"></span><span style="font-weight:500">全部老師</span>`;
+  allItem.addEventListener("click", () => {
+    selectedTeacherId = null;
+    document.querySelectorAll(".teacher-sel-item").forEach(i=>i.classList.remove("selected"));
+    allItem.classList.add("selected");
+    renderAllTable();
+    document.getElementById("salary-slip").style.display="none";
+    document.getElementById("export-hint").textContent="（月結總表）";
+  });
+  list.appendChild(allItem);
+
+  tids.forEach(tid => {
+    const t = allTeachers[tid];
+    if (!t) return;
+    const recs = allRecords.filter(r=>r.subTeacherId===tid);
+    const total = recs.reduce((s,r)=>s+(r.wage||0),0);
+    const item = document.createElement("div");
+    item.className = "teacher-sel-item";
+    item.innerHTML = `
+      <span class="light light-gray"></span>
+      <span class="${t.gender==="female"?"name-female":"name-male"}" style="flex:1">${t.name}</span>
+      <span class="text-xs text-muted">${total.toLocaleString()}元</span>`;
+    item.addEventListener("click", () => {
+      selectedTeacherId = tid;
+      document.querySelectorAll(".teacher-sel-item").forEach(i=>i.classList.remove("selected"));
+      item.classList.add("selected");
+      renderSlip(tid);
+      document.getElementById("export-hint").textContent = `（${t.name} 薪資單）`;
+    });
+    list.appendChild(item);
+  });
+}
+
+// ── Render all-teacher table ───────────────────────────────────
+function renderAllTable() {
+  document.getElementById("salary-thead").innerHTML = `
+    <tr>
+      <th>日期</th><th>請假老師</th><th>假別</th><th>代課老師</th>
+      <th>班級</th><th>類型</th><th>節次</th><th>經費</th><th style="text-align:right">薪資</th>
+    </tr>`;
+
+  const tbody = document.getElementById("salary-tbody");
+  if (!allRecords.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-muted text-sm" style="padding:24px;text-align:center">此期間無代課紀錄</td></tr>`;
+    document.getElementById("salary-tfoot").innerHTML = "";
+    return;
+  }
+
+  const total = allRecords.reduce((s,r)=>s+(r.wage||0),0);
+  tbody.innerHTML = "";
+  allRecords.forEach(r => {
+    const sesText = r.subType==="homeroom" ? "日薪" : (r.sessions?.map(s=>`第${s}節`).join("、")||"—");
+    const isSelf  = !["public","comp-public","pub-pta"].includes(r.fundType);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="white-space:nowrap">${r.date||"—"}</td>
+      <td>${r.absentName||"—"}</td>
+      <td class="text-sm">${r.leaveType||"—"}</td>
+      <td>${r.subName||"—"}</td>
+      <td>${r.className||"—"}</td>
+      <td>${r.subType==="homeroom"?`<span class="tag tag-amber">導師班</span>`:`<span class="tag tag-blue">科任</span>`}</td>
+      <td class="text-sm">${sesText}</td>
+      <td><span class="tag ${isSelf?"tag-amber":"tag-blue"}">${FUND_LABELS[r.fundType]||"—"}</span></td>
+      <td style="text-align:right;font-weight:500">${r.wage?r.wage.toLocaleString()+"元":"—"}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("salary-tfoot").innerHTML = `
+    <tr>
+      <td colspan="8" style="text-align:right">合計應領</td>
+      <td style="text-align:right;font-size:16px;color:var(--primary)">${total.toLocaleString()} 元</td>
+    </tr>`;
+
+  document.getElementById("salary-slip").style.display = "none";
+}
+
+// ── Render single-teacher salary slip ─────────────────────────
+function renderSlip(tid) {
+  const t = allTeachers[tid];
+  if (!t) return;
+  const recs = allRecords.filter(r=>r.subTeacherId===tid).sort((a,b)=>a.date?.localeCompare(b.date));
+  const from = document.getElementById("f-from").value;
+  const to   = document.getElementById("f-to").value;
+  const edu  = salaryTable[t.eduCode];
+
+  // group: public vs self
+  const publicRecs = recs.filter(r=>["public","comp-public","pub-pta"].includes(r.fundType));
+  const selfRecs   = recs.filter(r=>!["public","comp-public","pub-pta"].includes(r.fundType));
+  const totalWage  = recs.reduce((s,r)=>s+(r.wage||0),0);
+  const publicWage = publicRecs.reduce((s,r)=>s+(r.wage||0),0);
+  const selfWage   = selfRecs.reduce((s,r)=>s+(r.wage||0),0);
+
+  const rowsHtml = recs.map((r,i) => {
+    const sesText = r.subType==="homeroom" ? "（日薪＋導師費）" : (r.sessions?.map(s=>`第${s}節`).join("、")||"—");
+    const wageDetail = r.subType==="homeroom"
+      ? (() => {
+          const [y,m] = r.date.split("-").map(Number);
+          const dim = new Date(y,m,0).getDate();
+          const daily = edu?.daily?.[dim]||0;
+          const hf    = homeroomFee[dim]||0;
+          return `日薪 ${daily.toLocaleString()} + 導師費 ${hf.toLocaleString()}`;
+        })()
+      : `${r.sessions?.length||0}節 × ${sessionFee}元`;
+    const isSelf = !["public","comp-public","pub-pta"].includes(r.fundType);
+    return `
+      <tr style="font-size:13px">
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${i+1}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;white-space:nowrap">${r.date}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${r.absentName||"—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${r.className||"—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${r.leaveType||"—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#666">${sesText}<br>${wageDetail}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee"><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${isSelf?"#FAEEDA":"#E6F1FB"};color:${isSelf?"#633806":"#0C447C"}">${FUND_LABELS[r.fundType]||"—"}</span></td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${r.wage?r.wage.toLocaleString():"—"} 元</td>
+      </tr>`;
+  }).join("");
+
+  const schoolName = settings.schoolName || "高雄市左營區新莊國小";
+
+  document.getElementById("slip-content").innerHTML = `
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:18px;font-weight:700">${schoolName}</div>
+      <div style="font-size:15px;font-weight:600;margin-top:4px">代課費用通知單</div>
+      <div style="font-size:12px;color:#666;margin-top:4px">${from} ～ ${to}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:13px">
+      <div><span style="color:#888">代課老師：</span><strong class="${t.gender==="female"?"name-female":"name-male"}">${t.name}</strong></div>
+      <div><span style="color:#888">學歷：</span>${edu ? edu.label : "—"}</div>
+      <div><span style="color:#888">電話：</span>${t.phone||"—"}</div>
+      <div><span style="color:#888">Email：</span>${t.email||"—"}</div>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      <thead>
+        <tr style="background:#f8f9fa;font-size:11px;color:#666">
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">#</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">日期</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">請假老師</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">班級</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">假別</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">節次／說明</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">經費</th>
+          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dee2e6">金額</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+
+    <div style="background:#f8f9fa;border-radius:8px;padding:14px 18px;font-size:13px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span>公費部分（學校支付）</span><span style="font-weight:600;color:#185FA5">${publicWage.toLocaleString()} 元</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+        <span>自費部分（請假老師自付）</span><span style="font-weight:600;color:#BA7517">${selfWage.toLocaleString()} 元</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid #dee2e6;padding-top:10px">
+        <span style="font-weight:600;font-size:15px">合計應領</span>
+        <span style="font-weight:700;font-size:20px;color:#185FA5">${totalWage.toLocaleString()} 元</span>
+      </div>
+    </div>
+
+    ${selfWage>0?`<div style="margin-top:10px;font-size:12px;color:#BA7517;background:#FAEEDA;padding:8px 12px;border-radius:6px">
+      ⚠ 自費部分 ${selfWage.toLocaleString()} 元，請假老師請先至出納組完成繳費後，學校扣除保費再撥付代課費。
+    </div>`:""}
+
+    <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px;font-size:13px">
+      <div style="border-top:1px solid #ddd;padding-top:8px;text-align:center;color:#888">代課老師簽收</div>
+      <div style="border-top:1px solid #ddd;padding-top:8px;text-align:center;color:#888">教學組長</div>
+    </div>`;
+
+  document.getElementById("salary-table").style.display = "none";
+  document.getElementById("salary-slip").style.display  = "";
+
+  // update summary
+  document.getElementById("sum-total").textContent    = totalWage.toLocaleString()+" 元";
+  document.getElementById("sum-count").textContent    = recs.length;
+  document.getElementById("sum-teachers").textContent = "1";
+  document.getElementById("sum-period").textContent   = `${t.name}的薪資單`;
+}
+
+// ── Export Excel ──────────────────────────────────────────────
+function exportExcel() {
+  // build CSV and trigger download (SheetJS not available via CDN restriction, use CSV)
+  const from = document.getElementById("f-from").value;
+  const to   = document.getElementById("f-to").value;
+  const recs = selectedTeacherId
+    ? allRecords.filter(r=>r.subTeacherId===selectedTeacherId)
+    : allRecords;
+
+  const header = ["日期","請假老師","假別","代課老師","班級","科目","代課類型","節次","經費來源","薪資(元)"];
+  const rows = recs.map(r => [
+    r.date||"",
+    r.absentName||"",
+    r.leaveType||"",
+    r.subName||"",
+    r.className||"",
+    r.subject||"",
+    r.subType==="homeroom"?"代導師班":"代科任",
+    r.subType==="homeroom"?"日薪":(r.sessions?.map(s=>`第${s}節`).join("、")||""),
+    FUND_LABELS[r.fundType]||r.fundType||"",
+    r.wage||0,
+  ]);
+
+  const csvContent = [header, ...rows]
+    .map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(","))
+    .join("\n");
+
+  const bom = "\uFEFF";
+  const blob = new Blob([bom+csvContent], {type:"text/csv;charset=utf-8"});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url;
+  a.download = selectedTeacherId
+    ? `薪資單_${allTeachers[selectedTeacherId]?.name}_${from}_${to}.csv`
+    : `代課薪資總表_${from}_${to}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Events ────────────────────────────────────────────────────
+document.getElementById("btn-load").addEventListener("click", loadRecords);
+document.getElementById("btn-print").addEventListener("click", () => window.print());
+document.getElementById("btn-excel").addEventListener("click", exportExcel);
+
+// show table again when switching back from slip
+document.getElementById("salary-table").addEventListener("click", () => {});
+
+// ── Init ─────────────────────────────────────────────────────
+await loadSettings();
+await loadTeachers();
+</script>
+</body>
+</html>
