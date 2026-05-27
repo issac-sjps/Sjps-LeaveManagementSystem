@@ -343,7 +343,11 @@ function renderAllTable() {
   document.getElementById("salary-thead").innerHTML = `
     <tr>
       <th>日期</th><th>請假老師</th><th>假別</th><th>代課老師</th>
-      <th>班級</th><th>類型</th><th>節次</th><th>經費</th><th style="text-align:right">薪資</th>
+      <th>班級</th><th>類型</th><th>節次</th><th>經費</th>
+      <th style="text-align:right">日薪</th>
+      <th style="text-align:right">導師費</th>
+      <th style="text-align:right">鐘點費</th>
+      <th style="text-align:right;color:var(--primary)">合計</th>
     </tr>`;
 
   const tbody = document.getElementById("salary-tbody");
@@ -358,6 +362,13 @@ function renderAllTable() {
   allRecords.forEach(r => {
     const sesText = r.subType==="homeroom" ? "日薪" : (r.sessions?.map(s=>`第${s}節`).join("、")||"—");
     const isSelf  = !["public","comp-public","pub-pta"].includes(r.fundType);
+
+    // wage breakdown
+    const dailyW   = r.dailyWage    || 0;
+    const homeW    = r.homeroomWage || 0;
+    const sesW     = r.sessionWage  || (r.subType==="subject" ? (r.wage||0) : 0);
+    const total1   = r.wage || 0;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="white-space:nowrap">${r.date||"—"}</td>
@@ -368,13 +379,17 @@ function renderAllTable() {
       <td>${r.subType==="homeroom"?`<span class="tag tag-amber">導師班</span>`:`<span class="tag tag-blue">科任</span>`}</td>
       <td class="text-sm">${sesText}</td>
       <td><span class="tag ${isSelf?"tag-amber":"tag-blue"}">${FUND_LABELS[r.fundType]||"—"}</span></td>
-      <td style="text-align:right;font-weight:500">${r.wage?r.wage.toLocaleString()+"元":"—"}</td>`;
+      <td style="text-align:right;color:var(--gray-700)">${dailyW ? dailyW.toLocaleString()+"元" : "—"}</td>
+      <td style="text-align:right;color:var(--warning)">${homeW  ? homeW.toLocaleString()+"元"  : "—"}</td>
+      <td style="text-align:right;color:var(--success)">${sesW   ? sesW.toLocaleString()+"元"   : "—"}</td>
+      <td style="text-align:right;font-weight:600;color:var(--primary)">${total1 ? total1.toLocaleString()+"元" : "—"}</td>`;
     tbody.appendChild(tr);
   });
 
   document.getElementById("salary-tfoot").innerHTML = `
     <tr>
       <td colspan="8" style="text-align:right">合計應領</td>
+      <td colspan="3"></td>
       <td style="text-align:right;font-size:16px;color:var(--primary)">${total.toLocaleString()} 元</td>
     </tr>`;
 
@@ -399,15 +414,12 @@ function renderSlip(tid) {
 
   const rowsHtml = recs.map((r,i) => {
     const sesText = r.subType==="homeroom" ? "（日薪＋導師費）" : (r.sessions?.map(s=>`第${s}節`).join("、")||"—");
-    const wageDetail = r.subType==="homeroom"
-      ? (() => {
-          const [y,m] = r.date.split("-").map(Number);
-          const dim = new Date(y,m,0).getDate();
-          const daily = edu?.daily?.[dim]||0;
-          const hf    = homeroomFee[dim]||0;
-          return `日薪 ${daily.toLocaleString()} + 導師費 ${hf.toLocaleString()}`;
-        })()
-      : `${r.sessions?.length||0}節 × ${sessionFee}元`;
+    const [y,m] = r.date.split("-").map(Number);
+    const dim = new Date(y,m,0).getDate();
+    const dailyW = r.dailyWage    || (r.subType==="homeroom" ? (edu?.daily?.[dim]||0) : 0);
+    const homeW  = r.homeroomWage || (r.subType==="homeroom" ? (homeroomFee[dim]||0) : 0);
+    const sesW   = r.sessionWage  || (r.subType==="subject"  ? (r.sessions?.length||0)*sessionFee : 0);
+    const total1 = r.wage || (dailyW + homeW + sesW);
     const isSelf = !["public","comp-public","pub-pta"].includes(r.fundType);
     return `
       <tr style="font-size:13px">
@@ -416,9 +428,12 @@ function renderSlip(tid) {
         <td style="padding:8px 10px;border-bottom:1px solid #eee">${r.absentName||"—"}</td>
         <td style="padding:8px 10px;border-bottom:1px solid #eee">${r.className||"—"}</td>
         <td style="padding:8px 10px;border-bottom:1px solid #eee">${r.leaveType||"—"}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#666">${sesText}<br>${wageDetail}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#666">${sesText}</td>
         <td style="padding:8px 10px;border-bottom:1px solid #eee"><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${isSelf?"#FAEEDA":"#E6F1FB"};color:${isSelf?"#633806":"#0C447C"}">${FUND_LABELS[r.fundType]||"—"}</span></td>
-        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${r.wage?r.wage.toLocaleString():"—"} 元</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;color:#555">${dailyW?dailyW.toLocaleString()+"元":"—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;color:#BA7517">${homeW?homeW.toLocaleString()+"元":"—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;color:#3B6D11">${sesW?sesW.toLocaleString()+"元":"—"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${total1.toLocaleString()} 元</td>
       </tr>`;
   }).join("");
 
@@ -446,9 +461,12 @@ function renderSlip(tid) {
           <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">請假老師</th>
           <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">班級</th>
           <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">假別</th>
-          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">節次／說明</th>
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">節次</th>
           <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dee2e6">經費</th>
-          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dee2e6">金額</th>
+          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dee2e6">日薪</th>
+          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dee2e6;color:#BA7517">導師費</th>
+          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dee2e6;color:#3B6D11">鐘點費</th>
+          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dee2e6">合計</th>
         </tr>
       </thead>
       <tbody>${rowsHtml}</tbody>

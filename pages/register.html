@@ -185,10 +185,58 @@
             <button class="btn btn-secondary btn-sm" id="btn-reset" style="margin-left:auto">清除</button>
           </div>
 
-          <!-- 日期 -->
+          <!-- 日期 / 批次 -->
           <div class="form-group">
-            <label class="form-label">日期 *</label>
-            <input class="form-control" id="f-date" type="date">
+            <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+              <span>日期 *</span>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:400;cursor:pointer;color:var(--primary)">
+                <input type="checkbox" id="batch-mode"> 批次（日期範圍）
+              </label>
+            </label>
+            <!-- 單日模式 -->
+            <div id="single-date-wrap">
+              <input class="form-control" id="f-date" type="date">
+            </div>
+            <!-- 批次模式 -->
+            <div id="batch-date-wrap" style="display:none">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div>
+                  <div class="text-xs text-muted" style="margin-bottom:3px">起始日</div>
+                  <input class="form-control" id="f-date-from" type="date">
+                </div>
+                <div>
+                  <div class="text-xs text-muted" style="margin-bottom:3px">結束日</div>
+                  <input class="form-control" id="f-date-to" type="date">
+                </div>
+              </div>
+              <div style="margin-top:6px">
+                <div class="text-xs text-muted" style="margin-bottom:4px">排除星期（不代課的日子）</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap" id="batch-exclude-days">
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border:1px solid var(--gray-300);border-radius:20px;cursor:pointer;background:#fff">
+                    <input type="checkbox" value="0" style="width:11px;height:11px"> 日
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border:1px solid var(--gray-300);border-radius:20px;cursor:pointer;background:#fff">
+                    <input type="checkbox" value="1" style="width:11px;height:11px"> 一
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border:1px solid var(--gray-300);border-radius:20px;cursor:pointer;background:#fff">
+                    <input type="checkbox" value="2" style="width:11px;height:11px"> 二
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border:1px solid var(--gray-300);border-radius:20px;cursor:pointer;background:#fff">
+                    <input type="checkbox" value="3" style="width:11px;height:11px"> 三
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border:1px solid var(--gray-300);border-radius:20px;cursor:pointer;background:#fff">
+                    <input type="checkbox" value="4" style="width:11px;height:11px"> 四
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border:1px solid var(--gray-300);border-radius:20px;cursor:pointer;background:#fff">
+                    <input type="checkbox" value="5" style="width:11px;height:11px"> 五
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border:1px solid var(--gray-300);border-radius:20px;cursor:pointer;background:#fff">
+                    <input type="checkbox" value="6" style="width:11px;height:11px"> 六
+                  </label>
+                </div>
+              </div>
+              <div class="text-xs text-muted mt-4" id="batch-preview-text" style="color:var(--primary)"></div>
+            </div>
           </div>
 
           <!-- 請假老師 -->
@@ -297,6 +345,7 @@
           </div>
 
           <button class="btn btn-primary w-full" id="btn-save" style="margin-top:12px">儲存代課紀錄</button>
+          <div class="text-xs text-muted" id="batch-save-hint" style="text-align:center;margin-top:4px;display:none"></div>
         </div>
 
       </div>
@@ -554,6 +603,60 @@ makeAutocomplete("f-sub","ac-sub", allSubTeachers, t => {
   updateWagePreview();
 });
 
+// ── Batch mode toggle ─────────────────────────────────────────
+document.getElementById("batch-mode").addEventListener("change", e => {
+  const on = e.target.checked;
+  document.getElementById("single-date-wrap").style.display = on ? "none" : "";
+  document.getElementById("batch-date-wrap").style.display  = on ? "" : "none";
+  document.getElementById("batch-save-hint").style.display  = on ? "" : "none";
+  document.getElementById("btn-save").textContent = on ? "批次儲存代課紀錄" : "儲存代課紀錄";
+  updateBatchPreview();
+});
+
+function getBatchDates() {
+  const from = document.getElementById("f-date-from").value;
+  const to   = document.getElementById("f-date-to").value;
+  if (!from || !to || from > to) return [];
+  const excluded = [...document.querySelectorAll("#batch-exclude-days input:checked")]
+    .map(c => Number(c.value));
+  const dates = [];
+  let cur = new Date(from + "T00:00:00");
+  const end = new Date(to + "T00:00:00");
+  while (cur <= end) {
+    if (!excluded.includes(cur.getDay())) {
+      dates.push(cur.toISOString().slice(0,10));
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+function updateBatchPreview() {
+  if (!document.getElementById("batch-mode").checked) return;
+  const dates = getBatchDates();
+  const hint  = document.getElementById("batch-save-hint");
+  const prev  = document.getElementById("batch-preview-text");
+  if (dates.length === 0) {
+    prev.textContent = "";
+    hint.textContent = "";
+    document.getElementById("btn-save").textContent = "批次儲存代課紀錄";
+  } else {
+    prev.textContent = `共 ${dates.length} 天：${dates.slice(0,3).join("、")}${dates.length>3?"…":""}`;
+    hint.textContent = `將新增 ${dates.length} 筆代課紀錄`;
+    document.getElementById("btn-save").textContent = `批次儲存 ${dates.length} 筆`;
+  }
+}
+
+["f-date-from","f-date-to"].forEach(id =>
+  document.getElementById(id).addEventListener("change", () => {
+    updateBatchPreview();
+    updateWagePreview();
+  })
+);
+document.querySelectorAll("#batch-exclude-days input").forEach(cb =>
+  cb.addEventListener("change", updateBatchPreview)
+);
+
 document.getElementById("f-date").addEventListener("change", () => {
   const abId = document.getElementById("f-absent-id").value;
   if (abId) checkOvertime(abId, document.getElementById("f-date").value);
@@ -581,6 +684,16 @@ function resetForm() {
   document.querySelectorAll(".ses-btn").forEach(b=>b.classList.remove("selected"));
   document.getElementById("overtime-alert").classList.remove("show");
   document.getElementById("wage-preview").classList.remove("show");
+  // reset batch
+  document.getElementById("batch-mode").checked = false;
+  document.getElementById("single-date-wrap").style.display = "";
+  document.getElementById("batch-date-wrap").style.display  = "none";
+  document.getElementById("batch-save-hint").style.display  = "none";
+  document.getElementById("f-date-from").value = "";
+  document.getElementById("f-date-to").value   = "";
+  document.querySelectorAll("#batch-exclude-days input").forEach(c=>c.checked=false);
+  document.getElementById("batch-preview-text").textContent = "";
+  document.getElementById("btn-save").textContent = "儲存代課紀錄";
   subType = "subject";
   document.getElementById("tab-subject").classList.add("active");
   document.getElementById("tab-homeroom").classList.remove("active");
@@ -619,7 +732,7 @@ function loadEdit(r) {
 
 // ── Save ──────────────────────────────────────────────────────
 document.getElementById("btn-save").addEventListener("click", async () => {
-  const date      = document.getElementById("f-date").value;
+  const isBatch   = document.getElementById("batch-mode").checked;
   const absentName= document.getElementById("f-absent").value.trim();
   const absentId  = document.getElementById("f-absent-id").value;
   const leaveType = document.getElementById("f-leave-type").value;
@@ -628,8 +741,8 @@ document.getElementById("btn-save").addEventListener("click", async () => {
   const subId     = document.getElementById("f-sub-id").value;
   const className = document.getElementById("f-class").value.trim();
 
-  if (!date||!absentName||!leaveType||!fund||!subName||!className) {
-    alert("請填寫所有必填欄位（日期、請假老師、假別、經費來源、代課老師、班級）");
+  if (!absentName||!leaveType||!fund||!subName||!className) {
+    alert("請填寫所有必填欄位（請假老師、假別、經費來源、代課老師、班級）");
     return;
   }
   if (subType==="subject" && selectedSessions.size===0) {
@@ -637,45 +750,75 @@ document.getElementById("btn-save").addEventListener("click", async () => {
     return;
   }
 
-  const subTeacher = allSubTeachers.find(t=>t.id===subId);
-  const daysInMonth = new Date(Number(date.split("-")[0]), Number(date.split("-")[1]), 0).getDate();
-  const edu = salaryTable[subTeacher?.eduCode];
-
-  let wage = 0;
-  if (subType==="homeroom") {
-    wage = (edu?.daily?.[daysInMonth]||0) + (homeroomFee[daysInMonth]||0);
+  // determine dates list
+  let dates = [];
+  if (isBatch) {
+    dates = getBatchDates();
+    if (dates.length === 0) { alert("請設定有效的日期範圍"); return; }
+    if (dates.length > 60)  { alert("批次最多 60 天，請縮短範圍"); return; }
+    if (!confirm(`確定要新增 ${dates.length} 筆代課紀錄（${dates[0]} ～ ${dates[dates.length-1]}）？`)) return;
   } else {
-    wage = selectedSessions.size * sessionFee;
+    const d = document.getElementById("f-date").value;
+    if (!d) { alert("請選擇日期"); return; }
+    dates = [d];
   }
 
-  const data = {
-    date,
-    absentName,
-    absentId:     absentId  || null,
-    leaveType,
-    leaveNote:    document.getElementById("f-leave-note").value.trim(),
-    fundType:     fund,
-    subType,
-    subTeacherId: subId     || null,
-    subName,
-    isSchoolSub:  subTeacher?.isSchool || false,
-    className,
-    subject:      document.getElementById("f-subject").value.trim(),
-    sessions:     subType==="subject" ? [...selectedSessions].sort((a,b)=>a-b) : [],
-    notes:        document.getElementById("f-notes").value.trim(),
-    wage,
-    updatedAt: new Date().toISOString(),
-  };
+  const subTeacher = allSubTeachers.find(t=>t.id===subId);
 
   try {
-    if (editingId) {
-      await setDoc(doc(db,"records",editingId), data, {merge:true});
-    } else {
-      data.createdAt = new Date().toISOString();
-      await addDoc(collection(db,"records"), data);
+    let saved = 0;
+    for (const dateStr of dates) {
+      const [y,m] = dateStr.split("-").map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const edu = salaryTable[subTeacher?.eduCode];
+      let wage = 0, dailyWage = 0, homeroomWage = 0, sessionWage = 0;
+      if (subType==="homeroom") {
+        dailyWage   = edu?.daily?.[daysInMonth] || 0;
+        homeroomWage = homeroomFee[daysInMonth] || 0;
+        wage = dailyWage + homeroomWage;
+      } else {
+        sessionWage = selectedSessions.size * sessionFee;
+        wage = sessionWage;
+      }
+
+      const data = {
+        date: dateStr,
+        absentName, absentId: absentId||null, leaveType,
+        leaveNote:    document.getElementById("f-leave-note").value.trim(),
+        fundType:     fund,
+        subType,
+        subTeacherId: subId||null,
+        subName,
+        isSchoolSub:  subTeacher?.isSchool || false,
+        className,
+        subject:      document.getElementById("f-subject").value.trim(),
+        sessions:     subType==="subject" ? [...selectedSessions].sort((a,b)=>a-b) : [],
+        notes:        document.getElementById("f-notes").value.trim(),
+        wage,
+        dailyWage:    subType==="homeroom" ? dailyWage    : 0,
+        homeroomWage: subType==="homeroom" ? homeroomWage : 0,
+        sessionWage:  subType==="subject"  ? sessionWage  : 0,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (!isBatch && editingId) {
+        await setDoc(doc(db,"records",editingId), data, {merge:true});
+      } else {
+        data.createdAt = new Date().toISOString();
+        await addDoc(collection(db,"records"), data);
+      }
+      saved++;
     }
     resetForm();
     await loadAll();
+    if (isBatch) {
+      // brief success message
+      const hint = document.getElementById("batch-save-hint");
+      hint.style.display = "";
+      hint.style.color = "var(--success)";
+      hint.textContent = `✓ 已成功新增 ${saved} 筆代課紀錄`;
+      setTimeout(()=>{ hint.style.color=""; hint.textContent=""; }, 3000);
+    }
   } catch(e) { alert("儲存失敗："+e.message); }
 });
 
